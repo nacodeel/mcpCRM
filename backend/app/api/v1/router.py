@@ -1,0 +1,17 @@
+from fastapi import APIRouter
+
+from app.api.v1 import admin, auth, health, mcp, users
+from app.api.v1.crm import contacts, dashboard, deals, search
+
+router = APIRouter()
+
+router.include_router(health.router, prefix="/health", tags=["health"])
+router.include_router(auth.router, prefix="/auth", tags=["auth"])
+router.include_router(users.router, prefix="/users", tags=["users"])
+router.include_router(admin.router, prefix="/admin", tags=["admin"])
+router.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
+
+router.include_router(contacts.router, prefix="/crm/contacts", tags=["crm:contacts"])
+router.include_router(deals.router, prefix="/crm/deals", tags=["crm:deals"])
+router.include_router(dashboard.router, prefix="/crm/dashboard", tags=["crm:dashboard"])
+router.include_router(search.router, prefix="/crm/search", tags=["crm:search"])

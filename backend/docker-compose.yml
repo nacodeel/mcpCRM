@@ -1,15 +1,15 @@
 services:
   api:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     env_file:
       - .env
     ports:
       - "8000:8000"
     volumes:
-      # Mount the common database module into the backend container
-      - ./common/database:/app/database:ro
+      # Put the generated database module next to this backend and mount it here.
+      - ./database:/app/database:ro
     depends_on:
       db:
         condition: service_healthy
@@ -29,7 +29,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./postgres/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+      # Optional: mount init.sql if you bootstrap DB from SQL snapshot.
+      # - ./init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
       interval: 5s

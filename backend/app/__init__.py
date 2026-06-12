@@ -1,0 +1,1 @@
+"""Universal FastAPI backend template."""
