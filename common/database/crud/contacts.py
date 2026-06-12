@@ -59,7 +59,19 @@ class ContactCRUD(BaseCRUD[Contact]):
         filters = [Contact.user_id == user_id]
         if status is not None:
             filters.append(Contact.status == status)
-        return await self.list(*filters, order_by=("last_name", "first_name", "id"), limit=limit)
+        return await self.list(
+            *filters,
+            options=[
+                selectinload(Contact.phones),
+                selectinload(Contact.emails),
+                selectinload(Contact.addresses),
+                selectinload(Contact.tags),
+                selectinload(Contact.notes),
+                selectinload(Contact.deals),
+            ],
+            order_by=("last_name", "first_name", "id"),
+            limit=limit,
+        )
 
     async def page_by_user(
         self,
@@ -72,7 +84,20 @@ class ContactCRUD(BaseCRUD[Contact]):
         filters = [Contact.user_id == user_id]
         if status is not None:
             filters.append(Contact.status == status)
-        return await self.page(*filters, order_by=("last_name", "first_name", "id"), page=page, per_page=per_page)
+        return await self.page(
+            *filters,
+            options=[
+                selectinload(Contact.phones),
+                selectinload(Contact.emails),
+                selectinload(Contact.addresses),
+                selectinload(Contact.tags),
+                selectinload(Contact.notes),
+                selectinload(Contact.deals),
+            ],
+            order_by=("last_name", "first_name", "id"),
+            page=page,
+            per_page=per_page,
+        )
 
     async def by_status(
         self,
@@ -108,6 +133,14 @@ class ContactCRUD(BaseCRUD[Contact]):
                 Contact.full_name.ilike(pattern),
                 Contact.source.ilike(pattern),
             ),
+            options=[
+                selectinload(Contact.phones),
+                selectinload(Contact.emails),
+                selectinload(Contact.addresses),
+                selectinload(Contact.tags),
+                selectinload(Contact.notes),
+                selectinload(Contact.deals),
+            ],
             order_by=("last_name", "first_name", "id"),
             limit=limit,
         )

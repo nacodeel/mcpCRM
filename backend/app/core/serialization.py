@@ -13,14 +13,14 @@ from sqlalchemy.exc import NoInspectionAvailable
 
 def to_jsonable(value: Any) -> Any:
     """Convert ORM/Pydantic/domain objects into a safe API payload."""
+    if isinstance(value, Enum):
+        return value.value
     if value is None or isinstance(value, str | int | float | bool):
         return value
     if isinstance(value, Decimal):
         return str(value)
     if isinstance(value, datetime | date):
         return value.isoformat()
-    if isinstance(value, Enum):
-        return value.value
     if isinstance(value, BaseModel):
         return to_jsonable(value.model_dump(mode="json"))
     if isinstance(value, Mapping):

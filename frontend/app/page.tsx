@@ -349,7 +349,7 @@ export default function CRMPage() {
       if (reconnectTimer) clearTimeout(reconnectTimer);
       socket?.close();
     };
-  }, [fetchDB, triggerPush]);
+  }, [fetchDB, triggerPush, hasBackendToken]);
 
   // Contacts operations handlers
   const openCreateContact = () => {
@@ -624,7 +624,7 @@ export default function CRMPage() {
   // Helper date checker
   const isWithinLast7Days = (dateStr: string) => {
     const recordDate = new Date(dateStr);
-    const now = new Date('2026-06-11T09:01:03Z'); // Use metadata base time
+    const now = new Date();
     const diffTime = Math.abs(now.getTime() - recordDate.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays <= 7;
@@ -632,7 +632,7 @@ export default function CRMPage() {
 
   const isToday = (dateStr: string) => {
     const recordDate = new Date(dateStr);
-    const now = new Date('2026-06-11T09:01:03Z');
+    const now = new Date();
     return recordDate.toDateString() === now.toDateString();
   };
 
