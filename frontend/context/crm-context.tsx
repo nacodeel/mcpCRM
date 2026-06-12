@@ -7,7 +7,7 @@ import {
   Plus, Search, SlidersHorizontal, Trash2, Edit3, Copy, Eye, EyeOff,
   RefreshCw, User, Mail, Phone, MapPin, Calendar, TrendingUp, Wallet,
   Check, X, FileText, ArrowRight, CheckCircle2, AlertCircle, Sparkles, HelpCircle,
-  ShieldAlert, KeyRound
+  ShieldAlert, KeyRound, CreditCard
 } from 'lucide-react';
 import { useToast, Button, Input, Textarea, Select, Badge, Skeleton, ConfirmDialog, CustomDropdown } from '@/components/ui';
 import { Sidebar, CRMSection } from '@/components/sidebar';
