@@ -52,3 +52,80 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("referrer-policy", "strict-origin-when-cross-origin")
         response.headers.setdefault("permissions-policy", "geolocation=(), microphone=(), camera=()")
         return response
+
+
+class McpAuthMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope["path"].startswith("/mcp"):
+            import urllib.parse
+            from app.modules.mcp.service import McpService
+
+            headers = dict(scope.get("headers", []))
+            auth_header = headers.get(b"authorization", b"").decode("utf-8")
+            raw_key = ""
+
+            if auth_header.lower().startswith("bearer "):
+                raw_key = auth_header[7:].strip()
+
+            if not raw_key:
+                query_string = scope.get("query_string", b"").decode("utf-8")
+                params = urllib.parse.parse_qs(query_string)
+                token_list = params.get("token") or params.get("apiKey")
+                if token_list:
+                    raw_key = token_list[0]
+
+            if not raw_key:
+                await send({
+                    "type": "http.response.start",
+                    "status": 401,
+                    "headers": [(b"content-type", b"application/json")]
+                })
+                await send({
+                    "type": "http.response.body",
+                    "body": b'{"error":"Unauthorized: MCP key is required"}'
+                })
+                return
+
+            db = getattr(scope["app"].state, "db", None)
+            notifications = getattr(scope["app"].state, "notifications", None)
+            if not db:
+                await send({
+                    "type": "http.response.start",
+                    "status": 500,
+                    "headers": [(b"content-type", b"application/json")]
+                })
+                await send({
+                    "type": "http.response.body",
+                    "body": b'{"error":"Database manager is not initialized"}'
+                })
+                return
+
+            try:
+                service = McpService(db, notifications)
+                principal = await service.authenticate(raw_key)
+
+                from app.modules.mcp.fastmcp_server import current_mcp_principal
+                token = current_mcp_principal.set(principal)
+
+                try:
+                    await self.app(scope, receive, send)
+                finally:
+                    current_mcp_principal.reset(token)
+                return
+            except Exception as exc:
+                await send({
+                    "type": "http.response.start",
+                    "status": 401,
+                    "headers": [(b"content-type", b"application/json")]
+                })
+                await send({
+                    "type": "http.response.body",
+                    "body": f'{{"error":"Unauthorized: {str(exc)}"}}'.encode("utf-8")
+                })
+                return
+
+        await self.app(scope, receive, send)
+

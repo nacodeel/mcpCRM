@@ -68,5 +68,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
 
+    from app.core.middleware import McpAuthMiddleware
+    from app.modules.mcp.fastmcp_server import mcp
+
+    app.add_middleware(McpAuthMiddleware)
+    app.mount("/mcp", mcp.sse_app(mount_path="/mcp"))
+
     app.include_router(api_router)
     return app
+

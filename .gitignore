@@ -75,3 +75,5 @@ __pycache__/
 venv/
 ENV/
 .expo/
+*.egg-info/
+

@@ -10,9 +10,11 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt ./
-RUN pip install --upgrade pip \
-    && pip install -r requirements.txt
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+COPY pyproject.toml ./
+RUN uv pip install --system --no-cache -r pyproject.toml
+
 
 COPY app ./app
 COPY alembic.ini ./

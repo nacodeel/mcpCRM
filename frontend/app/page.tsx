@@ -851,16 +851,7 @@ export default function CRMPage() {
       <main className="flex-1 overflow-y-auto scrollbar-none h-full relative mx-auto w-full transition-all duration-150 flex flex-col p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl">
         
         {/* GLOBAL HEADER BAR WITH INTEGRATIONS */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white border border-[#EDEDED] py-2.5 px-4 rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.01)] gap-3 select-none mb-6">
-            {/* Left status indicator */}
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-2 w-2 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="text-[11px] md:text-xs text-neutral-500 font-medium">Синхронизация активна • Подключено по сокету</span>
-            </div>
-
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end bg-white border border-[#EDEDED] py-2.5 px-4 rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.01)] gap-3 select-none mb-6">
             {/* Right dropdown currency display */}
             <div className="flex items-center gap-2">
               <span className="text-[11px] md:text-xs text-neutral-400 font-medium whitespace-nowrap">Валюта CRM:</span>
