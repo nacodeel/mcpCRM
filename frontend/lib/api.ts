@@ -152,7 +152,16 @@ export class CrmApiClient {
         let errMsg = 'Не удалось зарегистрироваться';
         try {
           const errData = await response.json();
-          errMsg = errData.detail || errData.error?.message || errMsg;
+          if (errData.error?.code === 'validation_error' && Array.isArray(errData.error?.details?.errors)) {
+            // Translate common pydantic errors or display them directly
+            const msgs = errData.error.details.errors.map((e: any) => {
+              if (e.type === 'string_too_short') return `Поле слишком короткое (мин. ${e.ctx?.min_length || 8} симв.)`;
+              return e.msg;
+            });
+            errMsg = msgs.join('; ');
+          } else {
+            errMsg = errData.detail || errData.error?.message || errMsg;
+          }
         } catch {}
         throw new Error(errMsg);
       }
