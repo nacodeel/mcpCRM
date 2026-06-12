@@ -128,18 +128,18 @@ class McpService:
         from app.core.permissions import require_scope
         
         TOOL_SCOPES = {
-            "crm.contacts.list": "contacts:read",
-            "crm.contacts.create": "contacts:write",
-            "crm.contacts.update": "contacts:write",
-            "crm.contacts.delete": "contacts:delete",
-            "crm.deals.list": "contacts:read",
-            "crm.deals.create": "contacts:write",
-            "crm.deals.update": "contacts:write",
-            "crm.deals.delete": "deals:delete",
-            "crm.search": "contacts:read",
-            "crm.dashboard": "contacts:read",
-            "crm.batch.create.contacts": "contacts:write",
-            "crm.create.contact.with.deal": "contacts:write",
+            "crm.contacts.list": "read",
+            "crm.contacts.create": "create",
+            "crm.contacts.update": "update",
+            "crm.contacts.delete": "delete",
+            "crm.deals.list": "read",
+            "crm.deals.create": "create",
+            "crm.deals.update": "update",
+            "crm.deals.delete": "delete",
+            "crm.search": "read",
+            "crm.dashboard": "read",
+            "crm.batch.create.contacts": "create",
+            "crm.create.contact.with.deal": "create",
         }
         
         normalized_name = name.replace("_", ".")

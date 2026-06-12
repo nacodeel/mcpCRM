@@ -107,7 +107,7 @@ async def crm_contacts_list(
     per_page: int = 50,
 ) -> dict[str, Any]:
     """List CRM contacts for the authenticated user."""
-    principal = await check_auth("contacts:read", ctx)
+    principal = await check_auth("read", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
     data = await crm.list_contacts(principal.user_id, page=page, per_page=per_page)
@@ -131,7 +131,7 @@ async def crm_contacts_create(
     status: str | None = None,
 ) -> dict[str, Any]:
     """Create a CRM contact with phones, emails, addresses, tags and notes."""
-    principal = await check_auth("contacts:write", ctx)
+    principal = await check_auth("create", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
 
@@ -176,7 +176,7 @@ async def crm_contacts_update(
     status: str | None = None,
 ) -> dict[str, Any]:
     """Update an existing CRM contact including their phones, emails, addresses, tags and notes."""
-    principal = await check_auth("contacts:write", ctx)
+    principal = await check_auth("update", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
 
@@ -215,7 +215,7 @@ async def crm_batch_create_contacts(
     contacts: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Create multiple CRM contacts in a single batch operation."""
-    principal = await check_auth("contacts:write", ctx)
+    principal = await check_auth("create", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
 
@@ -257,7 +257,7 @@ async def crm_create_contact_with_deal(
     deal_description: str | None = None,
 ) -> dict[str, Any]:
     """Create a contact and immediately create and link a deal to them in one turn."""
-    principal = await check_auth("contacts:write", ctx)
+    principal = await check_auth("create", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
 
@@ -302,7 +302,7 @@ async def crm_contacts_delete(
     contact_id: int,
 ) -> dict[str, Any]:
     """Delete a CRM contact."""
-    principal = await check_auth("contacts:delete", ctx)
+    principal = await check_auth("delete", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
     await crm.delete_contact(principal.user_id, contact_id)
@@ -316,7 +316,7 @@ async def crm_deals_list(
     per_page: int = 50,
 ) -> dict[str, Any]:
     """List CRM deals for the authenticated user."""
-    principal = await check_auth("contacts:read", ctx)
+    principal = await check_auth("read", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
     data = await crm.list_deals(principal.user_id, page=page, per_page=per_page)
@@ -332,7 +332,7 @@ async def crm_deals_create(
     description: str | None = None,
 ) -> dict[str, Any]:
     """Create a CRM deal and notify connected frontend clients."""
-    principal = await check_auth("contacts:write", ctx)
+    principal = await check_auth("create", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
 
@@ -356,7 +356,7 @@ async def crm_deals_update(
     status: str | None = None,
 ) -> dict[str, Any]:
     """Update an existing CRM deal."""
-    principal = await check_auth("contacts:write", ctx)
+    principal = await check_auth("update", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
 
@@ -376,7 +376,7 @@ async def crm_deals_delete(
     deal_id: int,
 ) -> dict[str, Any]:
     """Delete a CRM deal."""
-    principal = await check_auth("deals:delete", ctx)
+    principal = await check_auth("delete", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
     await crm.delete_deal(principal.user_id, deal_id)
@@ -390,7 +390,7 @@ async def crm_search(
     limit: int = 20,
 ) -> dict[str, Any]:
     """Search CRM contacts and deals."""
-    principal = await check_auth("contacts:read", ctx)
+    principal = await check_auth("read", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
     data = await crm.search_all(principal.user_id, query=query, limit=limit)
@@ -400,7 +400,7 @@ async def crm_search(
 @mcp.tool()
 async def crm_dashboard(ctx: Context) -> dict[str, Any]:
     """Read CRM dashboard metrics."""
-    principal = await check_auth("contacts:read", ctx)
+    principal = await check_auth("read", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
     data = await crm.dashboard(principal.user_id)

@@ -49,7 +49,7 @@ async def bootstrap_database(db: DatabaseSessionManagerProtocol) -> None:
             user_id=admin.id,
             name="Default API Key",
             key_hash=hash_key(raw_mcp_key),
-            scopes=["contacts:read", "contacts:write"],
+            scopes=["read", "create", "update", "delete"],
             is_active=True,
         )
         crud.session.add(mcp_key)

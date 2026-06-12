@@ -53,26 +53,27 @@ export default function IntegrationPage() {
   const [isAdmin, setIsAdmin] = React.useState(true);
   const [scopes, setScopes] = React.useState({
     read: true,
-    write: true,
-    contactsWrite: false
+    create: true,
+    update: true,
+    delete: true
   });
 
   const [isCreating, setIsCreating] = React.useState(false);
 
-  // Sync sub-scopes when admin is toggled
-  React.useEffect(() => {
-    if (isAdmin) {
-      setScopes({ read: true, write: true, contactsWrite: false });
+  const handleToggleAdmin = (checked: boolean) => {
+    setIsAdmin(checked);
+    if (checked) {
+      setScopes({ read: true, create: true, update: true, delete: true });
+    } else {
+      setScopes({ read: false, create: false, update: false, delete: false });
     }
-  }, [isAdmin]);
+  };
 
-  const handleToggleScope = (key: 'read' | 'write' | 'contactsWrite') => {
+  const handleToggleScope = (key: 'read' | 'create' | 'update' | 'delete') => {
     setScopes(prev => {
       const next = { ...prev, [key]: !prev[key] };
-      // If any specific scope changes, turn off general Admin toggle if it doesn't align
-      if (isAdmin) {
-        setIsAdmin(false);
-      }
+      const allActive = next.read && next.create && next.update && next.delete;
+      setIsAdmin(allActive);
       return next;
     });
   };
@@ -80,7 +81,7 @@ export default function IntegrationPage() {
   const handleOpenModal = () => {
     setNewKeyName('');
     setIsAdmin(true);
-    setScopes({ read: true, write: true, contactsWrite: false });
+    setScopes({ read: true, create: true, update: true, delete: true });
     setIsModalOpen(true);
   };
 
@@ -91,18 +92,11 @@ export default function IntegrationPage() {
     setIsCreating(true);
     try {
       // Build scopes list based on toggles
-      let scopesList: string[] = [];
-      if (isAdmin) {
-        scopesList = ['crm:admin'];
-      } else {
-        if (scopes.read) scopesList.push('crm:read');
-        if (scopes.write) scopesList.push('crm:write');
-        if (scopes.contactsWrite) scopesList.push('contacts:write');
-      }
-
-      if (scopesList.length === 0) {
-        scopesList = ['crm:read']; // fallback default
-      }
+      const scopesList: string[] = [];
+      if (scopes.read) scopesList.push('read');
+      if (scopes.create) scopesList.push('create');
+      if (scopes.update) scopesList.push('update');
+      if (scopes.delete) scopesList.push('delete');
 
       const res = await CrmApiClient.createMcpKey(newKeyName.trim(), scopesList);
       if (res.success && res.data) {
@@ -181,7 +175,11 @@ export default function IntegrationPage() {
                           {k.scopes.map((s: string) => {
                             let label = s;
                             let color = 'bg-accent/10 text-text-primary border-border';
-                            if (s === 'crm:admin') { label = 'Админ'; color = 'bg-danger/10 text-danger border-danger/20'; }
+                            if (s === 'read') { label = 'Чтение'; color = 'bg-success/10 text-success border-success/20'; }
+                            else if (s === 'create') { label = 'Добавление'; color = 'bg-accent/10 text-text-primary border-border'; }
+                            else if (s === 'update') { label = 'Изменение'; color = 'bg-warning/10 text-warning border-warning/20'; }
+                            else if (s === 'delete') { label = 'Удаление'; color = 'bg-danger/10 text-danger border-danger/20'; }
+                            else if (s === 'crm:admin') { label = 'Админ'; color = 'bg-danger/10 text-danger border-danger/20'; }
                             else if (s === 'crm:read') { label = 'Чтение'; color = 'bg-success/10 text-success border-success/20'; }
                             else if (s === 'crm:write') { label = 'Запись и Удаление'; color = 'bg-warning/10 text-warning border-warning/20'; }
                             else if (s === 'contacts:write') { label = 'Запись'; color = 'bg-accent/10 text-text-primary border-border'; }
@@ -243,36 +241,45 @@ export default function IntegrationPage() {
               <div className="flex items-center justify-between p-2 hover:bg-surface-secondary/40 rounded-xl transition-colors">
                 <div>
                   <span className="text-xs font-bold text-text-primary block">Администратор (Полный доступ)</span>
-                  <span className="text-[10px] text-text-secondary font-medium">Полные права на просмотр, запись и удаление</span>
+                  <span className="text-[10px] text-text-secondary font-medium">Включает все 4 уровня доступа</span>
                 </div>
-                <Switch checked={isAdmin} onChange={setIsAdmin} />
+                <Switch checked={isAdmin} onChange={handleToggleAdmin} />
               </div>
 
               {/* READ Switch Option */}
               <div className="flex items-center justify-between p-2 hover:bg-surface-secondary/40 rounded-xl transition-colors">
                 <div>
-                  <span className="text-xs font-bold text-text-primary block">Просмотр CRM (crm:read)</span>
-                  <span className="text-[10px] text-text-secondary font-medium">Доступ к чтению контактов, сделок и дашборда</span>
+                  <span className="text-xs font-bold text-text-primary block">Чтение данных (read)</span>
+                  <span className="text-[10px] text-text-secondary font-medium">Просмотр контактов, сделок и аналитики</span>
                 </div>
-                <Switch checked={isAdmin || scopes.read} onChange={() => handleToggleScope('read')} disabled={isAdmin} />
+                <Switch checked={scopes.read} onChange={() => handleToggleScope('read')} />
               </div>
 
-              {/* WRITE CRM Switch Option */}
+              {/* CREATE Switch Option */}
               <div className="flex items-center justify-between p-2 hover:bg-surface-secondary/40 rounded-xl transition-colors">
                 <div>
-                  <span className="text-xs font-bold text-text-primary block">Редактирование воронки (crm:write)</span>
-                  <span className="text-[10px] text-text-secondary font-medium">Создание, обновление и удаление сделок и контактов</span>
+                  <span className="text-xs font-bold text-text-primary block">Добавление (create)</span>
+                  <span className="text-[10px] text-text-secondary font-medium">Создание новых контактов и сделок</span>
                 </div>
-                <Switch checked={isAdmin || scopes.write} onChange={() => handleToggleScope('write')} disabled={isAdmin} />
+                <Switch checked={scopes.create} onChange={() => handleToggleScope('create')} />
               </div>
 
-              {/* WRITE CONTACTS Switch Option */}
+              {/* UPDATE Switch Option */}
               <div className="flex items-center justify-between p-2 hover:bg-surface-secondary/40 rounded-xl transition-colors">
                 <div>
-                  <span className="text-xs font-bold text-text-primary block">Запись контактов (contacts:write)</span>
-                  <span className="text-[10px] text-text-secondary font-medium">Только добавление новых клиентов без удаления</span>
+                  <span className="text-xs font-bold text-text-primary block">Изменение (update)</span>
+                  <span className="text-[10px] text-text-secondary font-medium">Редактирование существующих контактов и сделок</span>
                 </div>
-                <Switch checked={isAdmin ? false : scopes.contactsWrite} onChange={() => handleToggleScope('contactsWrite')} disabled={isAdmin} />
+                <Switch checked={scopes.update} onChange={() => handleToggleScope('update')} />
+              </div>
+
+              {/* DELETE Switch Option */}
+              <div className="flex items-center justify-between p-2 hover:bg-surface-secondary/40 rounded-xl transition-colors">
+                <div>
+                  <span className="text-xs font-bold text-text-primary block">Удаление (delete)</span>
+                  <span className="text-[10px] text-text-secondary font-medium">Удаление контактов и сделок из базы</span>
+                </div>
+                <Switch checked={scopes.delete} onChange={() => handleToggleScope('delete')} />
               </div>
 
             </div>
