@@ -1475,7 +1475,15 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="ghost" onClick={() => setContactModalOpen(false)}>
+                      <Button variant="ghost" onClick={() => {
+                        if (editContactMode === 'edit') {
+                          const original = safeDb.contacts.find((c) => c.id === selectedContact.id);
+                          if (original) setSelectedContact(JSON.parse(JSON.stringify(original)));
+                          setEditContactMode('view');
+                        } else {
+                          setContactModalOpen(false);
+                        }
+                      }}>
                         Отмена
                       </Button>
                       <Button variant="primary" onClick={saveContactForm}>
@@ -1493,130 +1501,238 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         <ResponsiveModal
           isOpen={dealModalOpen}
           onClose={() => setDealModalOpen(false)}
-          title={editDealMode === 'create' ? 'Создать сделку' : 'Карточка сделки'}
+          title={editDealMode === 'create' ? 'Создать сделку' : editDealMode === 'view' ? 'Просмотр сделки' : 'Редактировать сделку'}
           className="max-w-xl"
         >
           {selectedDeal && (
-            <div className="space-y-5 font-normal text-sm select-none">
-              {/* Title */}
-              <div className="space-y-1">
-                <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Название сделки <span className="text-red-500">*</span></label>
-                <Input
-                  value={selectedDeal.title || ''}
-                  onChange={(e) => setSelectedDeal({ ...selectedDeal, title: e.target.value })}
-                  placeholder="КП на умного бота"
-                />
-              </div>
+            <div className="font-normal text-sm select-none">
+              {editDealMode === 'view' ? (
+                /* VIEW / READ-ONLY MODE */
+                <div className="space-y-6">
+                  {/* Header Info */}
+                  <div className="flex items-center justify-between border-b border-border pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-accent/10 text-accent rounded-2xl flex items-center justify-center font-bold text-lg">
+                        <CreditCard className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-text-primary">
+                          {selectedDeal.title}
+                        </h3>
+                        <p className="text-[10px] text-text-secondary font-bold uppercase tracking-wider mt-0.5">Сделка</p>
+                      </div>
+                    </div>
+                    <Button variant="secondary" size="sm" onClick={() => setEditDealMode('edit')} className="flex items-center gap-1.5 rounded-xl">
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Редактировать</span>
+                    </Button>
+                  </div>
 
-              {/* Description */}
-              <div className="space-y-1">
-                <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Описание сделки / КП</label>
-                <Textarea
-                  placeholder="Дополнительные детали технического задания..."
-                  value={selectedDeal.description || ''}
-                  onChange={(e) => setSelectedDeal({ ...selectedDeal, description: e.target.value })}
-                />
-              </div>
-
-              {/* Selection lists: linked Client and status dropdown */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Linked Client Selector */}
-                <div className="space-y-1">
-                  <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider block">Связанный контакт / Клиент <span className="text-red-500">*</span></label>
-                  <CustomDropdown
-                    className="w-full"
-                    placeholder="Выберите клиента"
-                    value={selectedDeal.contactId || ''}
-                    onChange={(val) => setSelectedDeal({ ...selectedDeal, contactId: val })}
-                    options={[
-                      { value: '', label: 'Выберите из списка', disabled: true },
-                      ...safeDb.contacts.map((c) => ({ value: c.id, label: c.name }))
-                    ]}
-                  />
-                </div>
-
-                {/* Status */}
-                <div className="space-y-1">
-                  <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider block font-sans">Статус сделки <span className="text-red-500">*</span></label>
-                  <CustomDropdown
-                    className="w-full"
-                    placeholder="Статус"
-                    value={selectedDeal.status || 'Новая'}
-                    onChange={(val) => setSelectedDeal({ ...selectedDeal, status: val as any })}
-                    options={[
-                      { value: 'Новая', label: 'Новая' },
-                      { value: 'В работе', label: 'В работе' },
-                      { value: 'Ожидание', label: 'Ожидание' },
-                      { value: 'Успешно', label: 'Успешно' },
-                      { value: 'Потеряна', label: 'Потеряна' }
-                    ]}
-                  />
-                </div>
-              </div>
-
-              {/* Amount sum input field */}
-              <div className="space-y-1">
-                <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Сумма сделки (Рядом в Рублях) <span className="text-red-500">*</span></label>
-                <div className="relative">
-                  <Input
-                    type="number"
-                    value={selectedDeal.amount || ''}
-                    onChange={(e) => setSelectedDeal({ ...selectedDeal, amount: Number(e.target.value) || 0 })}
-                    placeholder="250 000"
-                    className="pr-8"
-                  />
-                  <span className="absolute right-3.5 top-2.5 text-xs text-neutral-400 select-none">₽</span>
-                </div>
-              </div>
-
-              {/* Quick linked contact overview detail link */}
-              {editDealMode === 'edit' && selectedDeal.contactId && (
-                <div className="pt-2 border-t border-neutral-100 select-all">
-                  <span className="text-xs text-neutral-400 font-semibold uppercase tracking-wider block mb-1.5">Ответственный клиент</span>
-                  {(() => {
-                    const contact = safeDb.contacts.find((c) => c.id === selectedDeal.contactId);
-                    if (contact) {
-                      return (
-                        <div
-                          onClick={() => handleDealContactClick(selectedDeal.contactId!)}
-                          className="flex items-center justify-between p-2.5 rounded-lg border border-neutral-200 hover:bg-neutral-5 light:hover:text-black cursor-pointer bg-neutral-50/50 transition-colors duration-100 group"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-neutral-700 group-hover:text-neutral-900 truncate">
-                              {contact.name} ({contact.emails[0] || 'Телефон'})
-                            </span>
-                          </div>
-                          <ArrowRight className="w-3.5 h-3.5 text-neutral-400 group-hover:text-neutral-700 transition-transform group-hover:translate-x-0.5" />
+                  {/* Details grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      {/* Amount */}
+                      <div>
+                        <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block mb-2">Сумма сделки</span>
+                        <div className="text-lg font-bold text-text-primary">
+                          {selectedDeal.amount?.toLocaleString('ru-RU')} ₽
                         </div>
-                      );
-                    }
-                    return <span className="text-xs text-neutral-400">Контакт удален или изменен.</span>;
-                  })()}
+                      </div>
+                      
+                      {/* Status Dropdown (Editable in view mode) */}
+                      <div>
+                        <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block mb-2">Статус сделки</span>
+                        <CustomDropdown
+                          className="w-full"
+                          placeholder="Статус"
+                          value={selectedDeal.status || 'Новая'}
+                          onChange={(val) => {
+                            const updatedDeal = { ...selectedDeal, status: val as any };
+                            setSelectedDeal(updatedDeal);
+                            triggerAction('save_deal', updatedDeal, `Статус сделки "${updatedDeal.title}" изменен на ${val}.`);
+                          }}
+                          options={[
+                            { value: 'Новая', label: 'Новая' },
+                            { value: 'В работе', label: 'В работе' },
+                            { value: 'Ожидание', label: 'Ожидание' },
+                            { value: 'Успешно', label: 'Успешно' },
+                            { value: 'Потеряна', label: 'Потеряна' }
+                          ]}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Linked Contact */}
+                      <div>
+                        <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block mb-2">Ответственный клиент</span>
+                        {(() => {
+                          const contact = safeDb.contacts.find((c) => c.id === selectedDeal.contactId);
+                          if (contact) {
+                            return (
+                              <div
+                                onClick={() => handleDealContactClick(selectedDeal.contactId!)}
+                                className="flex items-center justify-between p-2.5 rounded-xl border border-border hover:bg-surface-secondary/40 cursor-pointer bg-surface transition-colors duration-150 group"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-semibold text-text-primary group-hover:text-accent truncate">
+                                    {contact.name} ({contact.emails?.[0] || contact.phones?.[0] || 'Нет контактов'})
+                                  </span>
+                                </div>
+                                <ArrowRight className="w-3.5 h-3.5 text-text-secondary group-hover:text-accent transition-transform group-hover:translate-x-0.5" />
+                              </div>
+                            );
+                          }
+                          return <span className="text-xs text-text-secondary/50 italic font-medium">Контакт удален или изменен.</span>;
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block mb-2">Описание сделки / КП</span>
+                    {selectedDeal.description ? (
+                      <div className="p-4 bg-surface-secondary/30 border border-border rounded-2xl text-xs text-text-primary leading-relaxed font-medium">
+                        {selectedDeal.description}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-text-secondary/50 italic font-medium">Нет описания</span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* EDIT / CREATE MODE */
+                <div className="space-y-5">
+                  {/* Title */}
+                  <div className="space-y-1">
+                    <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Название сделки <span className="text-red-500">*</span></label>
+                    <Input
+                      value={selectedDeal.title || ''}
+                      onChange={(e) => setSelectedDeal({ ...selectedDeal, title: e.target.value })}
+                      placeholder="КП на умного бота"
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div className="space-y-1">
+                    <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Описание сделки / КП</label>
+                    <Textarea
+                      placeholder="Дополнительные детали технического задания..."
+                      value={selectedDeal.description || ''}
+                      onChange={(e) => setSelectedDeal({ ...selectedDeal, description: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Selection lists: linked Client and status dropdown */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Linked Client Selector */}
+                    <div className="space-y-1">
+                      <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider block">Связанный контакт / Клиент <span className="text-red-500">*</span></label>
+                      <CustomDropdown
+                        className="w-full"
+                        placeholder="Выберите клиента"
+                        value={selectedDeal.contactId || ''}
+                        onChange={(val) => setSelectedDeal({ ...selectedDeal, contactId: val })}
+                        options={[
+                          { value: '', label: 'Выберите из списка', disabled: true },
+                          ...safeDb.contacts.map((c) => ({ value: c.id, label: c.name }))
+                        ]}
+                      />
+                    </div>
+
+                    {/* Status */}
+                    <div className="space-y-1">
+                      <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider block font-sans">Статус сделки <span className="text-red-500">*</span></label>
+                      <CustomDropdown
+                        className="w-full"
+                        placeholder="Статус"
+                        value={selectedDeal.status || 'Новая'}
+                        onChange={(val) => setSelectedDeal({ ...selectedDeal, status: val as any })}
+                        options={[
+                          { value: 'Новая', label: 'Новая' },
+                          { value: 'В работе', label: 'В работе' },
+                          { value: 'Ожидание', label: 'Ожидание' },
+                          { value: 'Успешно', label: 'Успешно' },
+                          { value: 'Потеряна', label: 'Потеряна' }
+                        ]}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Amount sum input field */}
+                  <div className="space-y-1">
+                    <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Сумма сделки (Рядом в Рублях) <span className="text-red-500">*</span></label>
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        value={selectedDeal.amount || ''}
+                        onChange={(e) => setSelectedDeal({ ...selectedDeal, amount: Number(e.target.value) || 0 })}
+                        placeholder="250 000"
+                        className="pr-8"
+                      />
+                      <span className="absolute right-3.5 top-2.5 text-xs text-neutral-400 select-none">₽</span>
+                    </div>
+                  </div>
+
+                  {/* Quick linked contact overview detail link */}
+                  {editDealMode === 'edit' && selectedDeal.contactId && (
+                    <div className="pt-2 border-t border-neutral-100 select-all">
+                      <span className="text-xs text-neutral-400 font-semibold uppercase tracking-wider block mb-1.5">Ответственный клиент</span>
+                      {(() => {
+                        const contact = safeDb.contacts.find((c) => c.id === selectedDeal.contactId);
+                        if (contact) {
+                          return (
+                            <div
+                              onClick={() => handleDealContactClick(selectedDeal.contactId!)}
+                              className="flex items-center justify-between p-2.5 rounded-xl border border-border hover:bg-surface-secondary/40 cursor-pointer bg-surface transition-colors duration-150 group"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-text-primary group-hover:text-accent truncate">
+                                  {contact.name} ({contact.emails[0] || 'Телефон'})
+                                </span>
+                              </div>
+                              <ArrowRight className="w-3.5 h-3.5 text-text-secondary group-hover:text-accent transition-transform group-hover:translate-x-0.5" />
+                            </div>
+                          );
+                        }
+                        return <span className="text-xs text-text-secondary/50 italic font-medium">Контакт удален или изменен.</span>;
+                      })()}
+                    </div>
+                  )}
+
+                  {/* SAVE CANCEL ACTIONS */}
+                  <div className="flex items-center justify-between gap-3 pt-5 border-t border-neutral-100">
+                    <div>
+                      {editDealMode === 'edit' && (
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => initiateDeleteDeal(selectedDeal.id!)}
+                        >
+                          Удалить сделку
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" onClick={() => {
+                        if (editDealMode === 'edit') {
+                          const original = safeDb.deals.find((d) => d.id === selectedDeal.id);
+                          if (original) setSelectedDeal(JSON.parse(JSON.stringify(original)));
+                          setEditDealMode('view');
+                        } else {
+                          setDealModalOpen(false);
+                        }
+                      }}>
+                        Отмена
+                      </Button>
+                      <Button variant="primary" onClick={saveDealForm}>
+                        Сохранить
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               )}
-
-              {/* SAVE CANCEL ACTIONS */}
-              <div className="flex items-center justify-between gap-3 pt-5 border-t border-neutral-100">
-                <div>
-                  {editDealMode === 'edit' && (
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => initiateDeleteDeal(selectedDeal.id!)}
-                    >
-                      Удалить сделку
-                    </Button>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" onClick={() => setDealModalOpen(false)}>
-                    Отмена
-                  </Button>
-                  <Button variant="primary" onClick={saveDealForm}>
-                    Сохранить
-                  </Button>
-                </div>
-              </div>
             </div>
           )}
         </ResponsiveModal>
