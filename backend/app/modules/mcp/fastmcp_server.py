@@ -1,17 +1,21 @@
-from mcp.server.fastmcp import FastMCP, Context
-from app.modules.mcp.schemas import McpPrincipal
+import os
+import contextvars
+from decimal import Decimal
+from typing import Any
+
+from mcp.server.fastmcp import Context, FastMCP
+
 from app.core.permissions import require_scope
-from app.modules.crm.service import CrmService
+from app.core.serialization import to_jsonable
 from app.modules.crm.schemas import (
     ContactCreateRequest,
     ContactUpdateRequest,
     DealCreateRequest,
     DealUpdateRequest,
 )
-from app.core.serialization import to_jsonable
-import contextvars
-from typing import Any
-from decimal import Decimal
+from app.modules.crm.service import CrmService
+from app.modules.mcp.schemas import McpPrincipal
+from app.modules.mcp.service import McpService
 
 # Define current principal contextvar
 current_mcp_principal: contextvars.ContextVar[McpPrincipal | None] = contextvars.ContextVar(
@@ -19,6 +23,7 @@ current_mcp_principal: contextvars.ContextVar[McpPrincipal | None] = contextvars
 )
 
 mcp = FastMCP("mcpCRM")
+
 
 def get_db_and_hub(ctx: Context) -> tuple[Any, Any]:
     request = ctx.request_context.request if (ctx and ctx.request_context) else None
@@ -31,18 +36,27 @@ def get_db_and_hub(ctx: Context) -> tuple[Any, Any]:
     # Fallback for Stdio/CLI context
     from app.core.config import get_settings
     from app.integrations.database import build_database_manager
+
     settings = get_settings()
+    
+    # Standard fallback DB connection for CLI running outside of Docker (use localhost if db is not reachable/running outside container network)
+    # FastMCP client connects via stdio, where db service hostname 'db' is not resolvable.
+    # We replace 'db:5432' with 'localhost:5432' if database connection fails or if we are outside docker.
+    db_url = settings.DATABASE_URL
+    if "db:5432" in db_url and not os.path.exists("/.dockerenv"):
+        db_url = db_url.replace("db:5432", "localhost:5432")
+    
+    settings.DATABASE_URL = db_url
     db = build_database_manager(settings)
     return db, None
+
 
 async def check_auth(required_scope: str, ctx: Context) -> McpPrincipal:
     principal = current_mcp_principal.get()
     if principal is None:
-        import os
         env_key = os.environ.get("MCP_API_KEY") or os.environ.get("MCP_KEY")
         if env_key:
             db, notifications = get_db_and_hub(ctx)
-            from app.modules.mcp.service import McpService
             service = McpService(db, notifications)
             try:
                 principal = await service.authenticate(env_key)
@@ -51,9 +65,10 @@ async def check_auth(required_scope: str, ctx: Context) -> McpPrincipal:
                 raise ValueError(f"Failed to authenticate key from environment: {e}")
 
     if principal is None:
-        raise ValueError("Not authenticated. Please specify a valid MCP key.")
+        raise ValueError("Not authenticated. Please specify a valid MCP key via MCP_API_KEY or MCP_KEY.")
     require_scope(principal.scopes, required_scope)
     return principal
+
 
 @mcp.tool()
 async def crm_contacts_list(ctx: Context, page: int = 1, per_page: int = 50) -> dict[str, Any]:
@@ -63,6 +78,7 @@ async def crm_contacts_list(ctx: Context, page: int = 1, per_page: int = 50) -> 
     crm = CrmService(db, hub)
     data = await crm.list_contacts(principal.user_id, page=page, per_page=per_page)
     return {"contacts": to_jsonable(data)}
+
 
 @mcp.tool()
 async def crm_contacts_create(
@@ -89,6 +105,7 @@ async def crm_contacts_create(
     data = await crm.create_contact(principal.user_id, payload)
     return {"contact": to_jsonable(data)}
 
+
 @mcp.tool()
 async def crm_contacts_update(
     ctx: Context,
@@ -112,14 +129,16 @@ async def crm_contacts_update(
     data = await crm.update_contact(principal.user_id, contact_id, payload)
     return {"contact": to_jsonable(data)}
 
+
 @mcp.tool()
 async def crm_contacts_delete(ctx: Context, contact_id: int) -> dict[str, Any]:
     """Delete a CRM contact."""
-    principal = await check_auth("contacts:write", ctx)
+    principal = await check_auth("contacts:delete", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
     await crm.delete_contact(principal.user_id, contact_id)
     return {"success": True, "message": f"Contact {contact_id} deleted successfully"}
+
 
 @mcp.tool()
 async def crm_deals_list(ctx: Context, page: int = 1, per_page: int = 50) -> dict[str, Any]:
@@ -129,6 +148,7 @@ async def crm_deals_list(ctx: Context, page: int = 1, per_page: int = 50) -> dic
     crm = CrmService(db, hub)
     data = await crm.list_deals(principal.user_id, page=page, per_page=per_page)
     return {"deals": to_jsonable(data)}
+
 
 @mcp.tool()
 async def crm_deals_create(
@@ -151,6 +171,7 @@ async def crm_deals_create(
     )
     data = await crm.create_deal(principal.user_id, payload)
     return {"deal": to_jsonable(data)}
+
 
 @mcp.tool()
 async def crm_deals_update(
@@ -175,14 +196,16 @@ async def crm_deals_update(
     data = await crm.update_deal(principal.user_id, deal_id, payload)
     return {"deal": to_jsonable(data)}
 
+
 @mcp.tool()
 async def crm_deals_delete(ctx: Context, deal_id: int) -> dict[str, Any]:
     """Delete a CRM deal."""
-    principal = await check_auth("contacts:write", ctx)
+    principal = await check_auth("deals:delete", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
     await crm.delete_deal(principal.user_id, deal_id)
     return {"success": True, "message": f"Deal {deal_id} deleted successfully"}
+
 
 @mcp.tool()
 async def crm_search(ctx: Context, query: str, limit: int = 20) -> dict[str, Any]:
@@ -193,6 +216,7 @@ async def crm_search(ctx: Context, query: str, limit: int = 20) -> dict[str, Any
     data = await crm.search_all(principal.user_id, query=query, limit=limit)
     return {"results": to_jsonable(data)}
 
+
 @mcp.tool()
 async def crm_dashboard(ctx: Context) -> dict[str, Any]:
     """Read CRM dashboard metrics."""
@@ -201,3 +225,7 @@ async def crm_dashboard(ctx: Context) -> dict[str, Any]:
     crm = CrmService(db, hub)
     data = await crm.dashboard(principal.user_id)
     return {"dashboard": to_jsonable(data)}
+
+
+if __name__ == "__main__":
+    mcp.run()

@@ -18,6 +18,7 @@ from app.core.middleware import (
 )
 from app.integrations.database import build_database_manager
 from app.observability.telemetry import setup_telemetry
+from app.modules.mcp.fastmcp_server import mcp
 
 
 @asynccontextmanager
@@ -76,12 +77,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
 
-    from app.core.middleware import McpAuthMiddleware
-    from app.modules.mcp.fastmcp_server import mcp
-
-    app.add_middleware(McpAuthMiddleware)
-    app.mount("/mcp", mcp.sse_app(mount_path="/mcp"))
-
     app.include_router(api_router)
+    
+    if settings.MCP_AUTH_ENABLED:
+        app.mount("/mcp", mcp.sse_app(mount_path="/mcp"))
+        
     return app
 

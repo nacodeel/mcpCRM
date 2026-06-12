@@ -37,3 +37,8 @@ class BootstrapAdminRequest(BaseModel):
     username: str = Field(min_length=3, max_length=120)
     name: str = Field(min_length=1, max_length=240)
     password: str = Field(min_length=8, max_length=512)
+
+class UserRegisterRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=120)
+    name: str = Field(min_length=1, max_length=240)
+    password: str = Field(min_length=8, max_length=512)

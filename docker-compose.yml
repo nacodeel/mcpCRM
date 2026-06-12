@@ -6,7 +6,6 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/app
       BACKEND_CORS_ORIGINS: '["http://localhost:3000"]'
     ports:
       - "8000:8000"

@@ -26,11 +26,13 @@ export default function CRMPage() {
 
   // Authentication states
   const [hasBackendToken, setHasBackendToken] = React.useState(false);
-  const [loginModalOpen, setLoginModalOpen] = React.useState(false);
+
   const [loginUsername, setLoginUsername] = React.useState('');
   const [loginPassword, setLoginPassword] = React.useState('');
   const [loginError, setLoginError] = React.useState('');
   const [isSubmittingLogin, setIsSubmittingLogin] = React.useState(false);
+  const [isRegistering, setIsRegistering] = React.useState(false);
+  const [registerName, setRegisterName] = React.useState('');
 
   // URL extraction for API instructions
   const [originUrl, setOriginUrl] = React.useState('https://your-crm.app');
@@ -58,15 +60,6 @@ export default function CRMPage() {
   // API Block states
   const [showApiKey, setShowApiKey] = React.useState(false);
 
-  // --- MULTI-CURRENCY SUPPORT ---
-  const CURRENCIES = React.useMemo(() => [
-    { code: 'RUB' as const, symbol: '₽', label: 'Рубль (₽)', rate: 1 },
-    { code: 'USD' as const, symbol: '$', label: 'Доллар ($)', rate: 1 / 90 },
-    { code: 'EUR' as const, symbol: '€', label: 'Евро (€)', rate: 1 / 98 },
-    { code: 'CNY' as const, symbol: '¥', label: 'Юань (¥)', rate: 1 / 12.5 },
-    { code: 'GBP' as const, symbol: '£', label: 'Фунт (£)', rate: 1 / 115 },
-  ], []);
-  const [selectedCurrency, setSelectedCurrency] = React.useState(CURRENCIES[0]);
 
   // --- PUSH NOTIFICATION SYSTEM ---
   const [pushBanner, setPushBanner] = React.useState<{ id: string; title: string; message: string } | null>(null);
@@ -139,7 +132,7 @@ export default function CRMPage() {
       if (response.success && response.data) {
         setDb(response.data);
       } else {
-        if (!silent) showToast(response.error || 'Не удалось загрузить данные CRM.', 'error');
+        if (token && !silent) showToast(response.error || 'Не удалось загрузить данные CRM.', 'error');
         if (token && !CrmApiClient.getToken()) {
           setHasBackendToken(false);
         }
@@ -227,25 +220,32 @@ export default function CRMPage() {
   const handleLogout = React.useCallback(() => {
     CrmApiClient.logout();
     setHasBackendToken(false);
-    showToast('Вы вышли из системы. Включен демо-режим.', 'success');
+    showToast('Вы успешно вышли из системы.', 'success');
     fetchDB();
   }, [fetchDB, showToast]);
 
-  const handleLoginSubmit = async (e: React.FormEvent) => {
+  const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
     setIsSubmittingLogin(true);
     try {
-      const res = await CrmApiClient.login(loginUsername, loginPassword);
+      let res;
+      if (isRegistering) {
+        if (!registerName.trim()) throw new Error("Введите имя");
+        res = await CrmApiClient.register(loginUsername, registerName, loginPassword);
+      } else {
+        res = await CrmApiClient.login(loginUsername, loginPassword);
+      }
+      
       if (res.success) {
         setHasBackendToken(true);
-        setLoginModalOpen(false);
         setLoginUsername('');
         setLoginPassword('');
-        showToast('Успешный вход на сервер!', 'success');
+        setRegisterName('');
+        showToast(isRegistering ? 'Регистрация успешна!' : 'Успешный вход!', 'success');
         fetchDB();
       } else {
-        setLoginError(res.error || 'Неверные учетные данные');
+        setLoginError(res.error || (isRegistering ? 'Ошибка регистрации' : 'Неверные данные'));
       }
     } catch (err: any) {
       setLoginError(err.message || 'Ошибка подключения');
@@ -476,6 +476,93 @@ export default function CRMPage() {
     );
   }
 
+  if (!hasBackendToken) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-[#F9F9F8] text-[#1A1A1A] font-sans antialiased overflow-hidden p-4">
+        <div className="w-full max-w-md bg-white border border-[#EDEDED] p-8 rounded-2xl shadow-xl space-y-6">
+          <div className="text-center space-y-2">
+            <div className="w-12 h-12 bg-neutral-900 text-white rounded-xl flex items-center justify-center font-bold text-xl mx-auto shadow-md">
+              c
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight">Mini CRM</h2>
+            <p className="text-xs text-neutral-400">Вход в систему управления клиентами</p>
+          </div>
+
+          {loginError && (
+            <div className="flex items-center gap-2.5 p-3.5 bg-red-50 border border-red-100 text-red-800 text-xs rounded-xl shadow-[0_2px_4px_rgba(239,68,68,0.02)]">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span className="font-medium">{loginError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleAuthSubmit} className="space-y-4">
+            {isRegistering && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Ваше имя</label>
+                <Input
+                  type="text"
+                  required
+                  value={registerName}
+                  onChange={(e) => setRegisterName(e.target.value)}
+                  placeholder="Иван Иванов"
+                  disabled={isSubmittingLogin}
+                  className="rounded-xl border-[#EDEDED] focus:border-neutral-900"
+                />
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <label className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Имя пользователя</label>
+              <Input
+                type="text"
+                required
+                value={loginUsername}
+                onChange={(e) => setLoginUsername(e.target.value)}
+                placeholder="admin"
+                disabled={isSubmittingLogin}
+                className="rounded-xl border-[#EDEDED] focus:border-neutral-900"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Пароль</label>
+              <Input
+                type="password"
+                required
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                placeholder="••••••••"
+                disabled={isSubmittingLogin}
+                className="rounded-xl border-[#EDEDED] focus:border-neutral-900"
+              />
+            </div>
+
+            <Button
+              type="submit"
+              variant="primary"
+              loading={isSubmittingLogin}
+              className="w-full py-3 rounded-xl bg-neutral-900 text-white hover:bg-neutral-800 font-semibold shadow-md transition-all duration-150 mt-2"
+            >
+              {isRegistering ? 'Зарегистрироваться' : 'Войти'}
+            </Button>
+            
+            <div className="text-center pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRegistering(!isRegistering);
+                  setLoginError('');
+                }}
+                className="text-xs text-neutral-500 hover:text-neutral-800 underline-offset-4 hover:underline transition-colors"
+              >
+                {isRegistering ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   const safeDb = db || { contacts: [], deals: [], apiKey: '', profile: { name: 'Никита', email: 'nikiteron@gmail.com', avatarUrl: '', notifications: true } };
 
   // Helper date checker
@@ -653,12 +740,11 @@ export default function CRMPage() {
 
   // Shared formatting
   const formatMoney = (amountInRub: number) => {
-    const converted = amountInRub * selectedCurrency.rate;
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
-      currency: selectedCurrency.code,
+      currency: 'RUB',
       maximumFractionDigits: 0
-    }).format(converted);
+    }).format(amountInRub);
   };
 
   const formatDate = (dateStr: string) => {
@@ -888,73 +974,12 @@ export default function CRMPage() {
         }}
         userName={safeDb.profile.name}
         userEmail={safeDb.profile.email}
+        onLogout={handleLogout}
       />
 
       {/* 2. MAIN WORKING REGION */}
       <main className="flex-1 overflow-y-auto scrollbar-none h-full relative mx-auto w-full transition-all duration-150 flex flex-col p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl">
-        
-        {/* GLOBAL HEADER BAR WITH INTEGRATIONS */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end bg-white border border-[#EDEDED] py-2.5 px-4 rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.01)] gap-3 select-none mb-6">
-            {/* Connection state / Auth indicator */}
-            <div className="flex items-center gap-2 border-r border-[#EDEDED] pr-3 mr-1">
-              <span className="text-[11px] md:text-xs text-neutral-400 font-medium whitespace-nowrap">Режим:</span>
-              {hasBackendToken ? (
-                <div className="flex items-center gap-2">
-                  <span className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] md:text-xs font-semibold px-2 py-0.5 rounded-full">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Сервер (Postgres)
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-[10px] md:text-xs text-red-500 hover:text-red-600 hover:bg-red-50 py-0.5 px-1.5 h-7"
-                    onClick={handleLogout}
-                  >
-                    Выйти
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span className="flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-800 text-[10px] md:text-xs font-semibold px-2 py-0.5 rounded-full">
-                    Демо (Локально)
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-[10px] md:text-xs text-[#1A1A1A] hover:bg-[#F5F5F4] py-0.5 px-2.5 h-7 border border-[#EDEDED]"
-                    onClick={() => {
-                      setLoginError('');
-                      setLoginModalOpen(true);
-                    }}
-                  >
-                    Подключить сервер
-                  </Button>
-                </div>
-              )}
-            </div>
 
-            {/* Right dropdown currency display */}
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] md:text-xs text-neutral-400 font-medium whitespace-nowrap">Валюта CRM:</span>
-              <CustomDropdown
-                className="w-36 md:w-40"
-                placeholder="Изменить валюту"
-                value={selectedCurrency.code}
-                onChange={(val) => {
-                  const found = CURRENCIES.find(c => c.code === val);
-                  if (found) {
-                    setSelectedCurrency(found);
-                    showToast(`Валюта отображения в CRM изменена на ${found.code}`, 'success');
-                  }
-                }}
-                options={CURRENCIES.map(c => ({
-                  value: c.code,
-                  label: c.label,
-                  icon: <span className="font-mono font-bold text-xs bg-neutral-100 text-neutral-600 w-4 h-4 rounded flex items-center justify-center">{c.symbol}</span>
-                }))}
-              />
-            </div>
-          </div>
 
         <AnimatePresence mode="wait">
           {currentSection === 'dashboard' && (
@@ -1690,69 +1715,7 @@ export default function CRMPage() {
       {/* 3. MODALS AND SHEET COMPONENT WRAPPERS */}
       {/* ========================================= */}
 
-      {/* LOGIN MODAL */}
-      <ResponsiveModal
-        isOpen={loginModalOpen}
-        onClose={() => setLoginModalOpen(false)}
-        title="Авторизация на сервере"
-        className="max-w-md"
-      >
-        <form onSubmit={handleLoginSubmit} className="space-y-4 font-normal text-sm">
-          <p className="text-xs text-neutral-405 leading-normal mb-2 text-neutral-500">
-            Введите имя пользователя и пароль для подключения к базе данных PostgreSQL.
-            Используйте учетные данные по умолчанию (<code className="font-mono text-neutral-800 bg-neutral-100 px-1 rounded">admin</code> / <code className="font-mono text-neutral-800 bg-neutral-100 px-1 rounded">adminpassword</code>), если вы запускаете сервер впервые.
-          </p>
 
-          {loginError && (
-            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 text-red-800 text-xs rounded-lg">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <span>{loginError}</span>
-            </div>
-          )}
-
-          <div className="space-y-1">
-            <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Имя пользователя</label>
-            <Input
-              type="text"
-              required
-              value={loginUsername}
-              onChange={(e) => setLoginUsername(e.target.value)}
-              placeholder="admin"
-              disabled={isSubmittingLogin}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Пароль</label>
-            <Input
-              type="password"
-              required
-              value={loginPassword}
-              onChange={(e) => setLoginPassword(e.target.value)}
-              placeholder="••••••••"
-              disabled={isSubmittingLogin}
-            />
-          </div>
-
-          <div className="pt-2 flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setLoginModalOpen(false)}
-              disabled={isSubmittingLogin}
-            >
-              Отмена
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              loading={isSubmittingLogin}
-            >
-              Войти
-            </Button>
-          </div>
-        </form>
-      </ResponsiveModal>
 
       {/* CONTACTS CREATE / EDIT VIEW */}
       <ResponsiveModal

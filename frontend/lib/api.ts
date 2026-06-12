@@ -12,13 +12,6 @@ type BackendEnvelope<T> = {
   error?: { message?: string };
 };
 
-const DEFAULT_PROFILE: UserProfile = {
-  name: 'CRM User',
-  email: 'crm@example.com',
-  avatarUrl: '',
-  notifications: true,
-};
-
 const statusToRu: Record<string, Deal['status']> = {
   NEW: 'Новая',
   CONTACTED: 'В работе',
@@ -40,12 +33,9 @@ const statusFromRu: Record<string, string> = {
 
 /**
  * Centered TypeScript API Client Service for the Mini CRM.
- * Uses the production FastAPI backend when a JWT token is available and falls
- * back to the local Next.js demo API otherwise.
+ * Connected directly to the production FastAPI backend.
  */
 export class CrmApiClient {
-  private static baseUrl = '/api/crm';
-
   static getRealtimeUrl(): string | null {
     if (typeof window === 'undefined') return null;
     const token = this.getToken();
@@ -71,7 +61,7 @@ export class CrmApiClient {
 
   private static async backendRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
     const token = this.getToken();
-    if (!token) throw new Error('Токен доступа не найден.');
+    if (!token) throw new Error('Токен доступа не найден. Пожалуйста, авторизуйтесь.');
 
     const backendUrl = this.getBackendUrl();
     let response;
@@ -90,6 +80,9 @@ export class CrmApiClient {
 
     if (response.status === 401 || response.status === 403) {
       this.logout();
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
     }
 
     let raw;
@@ -141,6 +134,33 @@ export class CrmApiClient {
       return { success: true, data: token };
     } catch (err: any) {
       return { success: false, error: err.message || 'Ошибка входа' };
+    }
+  }
+
+  static async register(username: string, name: string, password: string): Promise<ApiResponse<string>> {
+    try {
+      const backendUrl = this.getBackendUrl();
+      const response = await fetch(`${backendUrl}/api/v1/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, name, password }),
+      });
+
+      if (!response.ok) {
+        let errMsg = 'Не удалось зарегистрироваться';
+        try {
+          const errData = await response.json();
+          errMsg = errData.detail || errData.error?.message || errMsg;
+        } catch {}
+        throw new Error(errMsg);
+      }
+
+      // Automatically login after successful registration
+      return await this.login(username, password);
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Ошибка регистрации' };
     }
   }
 
@@ -200,169 +220,113 @@ export class CrmApiClient {
   }
 
   private static async getBackendDatabase(): Promise<CRMDatabase> {
-    const [contactsPayload, dealsPayload] = await Promise.all([
+    const [contactsPayload, dealsPayload, profilePayload] = await Promise.all([
       this.backendRequest<any>('/api/v1/crm/contacts?per_page=200'),
       this.backendRequest<any>('/api/v1/crm/deals?per_page=200'),
+      this.backendRequest<any>('/api/v1/users/me'),
     ]);
 
     return {
       contacts: this.normalizePage<any>(contactsPayload).map(this.backendContactToUi),
       deals: this.normalizePage<any>(dealsPayload).map(this.backendDealToUi),
-      apiKey: 'Используется JWT/MCP ключ на backend',
-      profile: DEFAULT_PROFILE,
+      apiKey: 'Пожалуйста, используйте JWT / авторизацию для MCP',
+      profile: {
+        name: profilePayload.name || profilePayload.username || 'Пользователь CRM',
+        email: profilePayload.username || 'email@example.com',
+        avatarUrl: '',
+        notifications: true,
+      },
     };
   }
 
-  /** Helper utility for local demo API requests. */
-  private static async request<T>(method: 'GET' | 'POST', payload?: any): Promise<ApiResponse<T>> {
-    try {
-      const options: RequestInit = {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      };
-
-      if (method === 'POST' && payload) {
-        options.body = JSON.stringify(payload);
-      }
-
-      const response = await fetch(this.baseUrl, options);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const rawResult = await response.json();
-
-      if (rawResult.error) {
-        return { success: false, error: rawResult.error };
-      }
-
-      return {
-        success: true,
-        data: (rawResult.db ? rawResult.db : rawResult) as T,
-      };
-    } catch (err: any) {
-      console.error('CRM API client error:', err);
-      return {
-        success: false,
-        error: err.message || 'Сбой подключения к серверу.',
-      };
-    }
-  }
-
   static async getDatabase(): Promise<ApiResponse<CRMDatabase>> {
-    if (this.getToken()) {
-      try {
-        return { success: true, data: await this.getBackendDatabase() };
-      } catch (err: any) {
-        return { success: false, error: err.message || 'Не удалось загрузить backend CRM.' };
-      }
+    try {
+      return { success: true, data: await this.getBackendDatabase() };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Не удалось загрузить backend CRM.' };
     }
-    return this.request<CRMDatabase>('GET');
   }
 
   static async saveContact(contact: Partial<Contact>): Promise<ApiResponse<CRMDatabase>> {
-    if (this.getToken()) {
-      try {
-        const body = {
-          ...this.splitName(contact.name),
-          phones: contact.phones || [],
-          emails: contact.emails || [],
-          addresses: contact.addresses || [],
-          tags: contact.tags || [],
-          note: contact.notes,
-        };
-        const isBackendId = contact.id && /^\d+$/.test(contact.id);
-        if (isBackendId) {
-          await this.backendRequest(`/api/v1/crm/contacts/${contact.id}`, {
-            method: 'PATCH',
-            body: JSON.stringify(body),
-          });
-        } else {
-          await this.backendRequest('/api/v1/crm/contacts', {
-            method: 'POST',
-            body: JSON.stringify(body),
-          });
-        }
-        return { success: true, data: await this.getBackendDatabase() };
-      } catch (err: any) {
-        return { success: false, error: err.message || 'Не удалось сохранить контакт.' };
+    try {
+      const body = {
+        ...this.splitName(contact.name),
+        phones: contact.phones || [],
+        emails: contact.emails || [],
+        addresses: contact.addresses || [],
+        tags: contact.tags || [],
+        note: contact.notes,
+      };
+      
+      const isEdit = !!contact.id;
+      if (isEdit) {
+        await this.backendRequest(`/api/v1/crm/contacts/${contact.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(body),
+        });
+      } else {
+        await this.backendRequest('/api/v1/crm/contacts', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
       }
+      return { success: true, data: await this.getBackendDatabase() };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Не удалось сохранить контакт.' };
     }
-    return this.request<CRMDatabase>('POST', {
-      action: 'save_contact',
-      payload: contact,
-    });
   }
 
   static async deleteContact(id: string): Promise<ApiResponse<CRMDatabase>> {
-    if (this.getToken() && /^\d+$/.test(id)) {
-      try {
-        await this.backendRequest(`/api/v1/crm/contacts/${id}`, { method: 'DELETE' });
-        return { success: true, data: await this.getBackendDatabase() };
-      } catch (err: any) {
-        return { success: false, error: err.message || 'Не удалось удалить контакт.' };
-      }
+    try {
+      await this.backendRequest(`/api/v1/crm/contacts/${id}`, { method: 'DELETE' });
+      return { success: true, data: await this.getBackendDatabase() };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Не удалось удалить контакт.' };
     }
-    return this.request<CRMDatabase>('POST', {
-      action: 'delete_contact',
-      payload: { id },
-    });
   }
 
   static async saveDeal(deal: Partial<Deal>): Promise<ApiResponse<CRMDatabase>> {
-    if (this.getToken()) {
-      try {
-        const body = {
-          contact_id: Number(deal.contactId),
-          title: deal.title,
-          description: deal.description,
-          amount: deal.amount,
-          status: deal.status ? statusFromRu[deal.status] || 'NEW' : 'NEW',
-        };
-        const isBackendId = deal.id && /^\d+$/.test(deal.id);
-        await this.backendRequest(isBackendId ? `/api/v1/crm/deals/${deal.id}` : '/api/v1/crm/deals', {
-          method: isBackendId ? 'PATCH' : 'POST',
+    try {
+      const body = {
+        contact_id: Number(deal.contactId),
+        title: deal.title,
+        description: deal.description,
+        amount: deal.amount,
+        status: deal.status ? statusFromRu[deal.status] || 'NEW' : 'NEW',
+      };
+      
+      const isEdit = !!deal.id;
+      if (isEdit) {
+        await this.backendRequest(`/api/v1/crm/deals/${deal.id}`, {
+          method: 'PATCH',
           body: JSON.stringify(body),
         });
-        return { success: true, data: await this.getBackendDatabase() };
-      } catch (err: any) {
-        return { success: false, error: err.message || 'Не удалось сохранить сделку.' };
+      } else {
+        await this.backendRequest('/api/v1/crm/deals', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
       }
+      return { success: true, data: await this.getBackendDatabase() };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Не удалось сохранить сделку.' };
     }
-    return this.request<CRMDatabase>('POST', {
-      action: 'save_deal',
-      payload: deal,
-    });
   }
 
   static async deleteDeal(id: string): Promise<ApiResponse<CRMDatabase>> {
-    if (this.getToken() && /^\d+$/.test(id)) {
-      try {
-        await this.backendRequest(`/api/v1/crm/deals/${id}`, { method: 'DELETE' });
-        return { success: true, data: await this.getBackendDatabase() };
-      } catch (err: any) {
-        return { success: false, error: err.message || 'Не удалось удалить сделку.' };
-      }
+    try {
+      await this.backendRequest(`/api/v1/crm/deals/${id}`, { method: 'DELETE' });
+      return { success: true, data: await this.getBackendDatabase() };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Не удалось удалить сделку.' };
     }
-    return this.request<CRMDatabase>('POST', {
-      action: 'delete_deal',
-      payload: { id },
-    });
   }
 
   static async regenerateApiKey(): Promise<ApiResponse<CRMDatabase>> {
-    return this.request<CRMDatabase>('POST', {
-      action: 'regenerate_apiKey',
-      payload: {},
-    });
+    return { success: false, error: 'Действие недоступно на сервере.' };
   }
 
   static async updateProfile(profile: Partial<UserProfile>): Promise<ApiResponse<CRMDatabase>> {
-    return this.request<CRMDatabase>('POST', {
-      action: 'update_profile',
-      payload: profile,
-    });
+    return { success: false, error: 'Редактирование профиля недоступно.' };
   }
 }

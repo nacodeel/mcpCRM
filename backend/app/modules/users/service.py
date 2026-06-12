@@ -1,9 +1,9 @@
 from typing import Any
 
-from app.core.exceptions import NotFoundError, UnauthorizedError
+from app.core.exceptions import BadRequestError, NotFoundError, UnauthorizedError
 from app.core.security import hash_password
 from app.integrations.database import DatabaseSessionManagerProtocol
-from app.modules.users.schemas import BootstrapAdminRequest
+from app.modules.users.schemas import BootstrapAdminRequest, UserRegisterRequest
 
 
 class UserService:
@@ -62,3 +62,34 @@ class UserService:
         if user is None:
             raise NotFoundError("User not found")
         return user
+
+    async def register_user(self, payload: UserRegisterRequest) -> Any:
+        async with self.db.transactional_crud() as crud:
+            users = getattr(crud, "users", getattr(crud, "user", None))
+            if users is None:
+                raise RuntimeError("database CRUD must expose users repository")
+
+            existing = None
+            if hasattr(users, "get_by_username"):
+                existing = await users.get_by_username(payload.username)
+            if existing is not None:
+                raise BadRequestError("User with this username already exists")
+
+            role_value: Any = "USER"
+            try:
+                from database.enums import UserRole
+                role_value = UserRole.USER
+            except Exception:
+                role_value = "USER"
+
+            create_data = {
+                "username": payload.username,
+                "name": payload.name,
+                "password_hash": hash_password(payload.password),
+                "role": role_value,
+                "is_active": True,
+            }
+            try:
+                return await users.create(**create_data)
+            except TypeError:
+                return await users.create(create_data)

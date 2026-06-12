@@ -10,8 +10,6 @@ from app.core.exceptions import UnauthorizedError
 from app.core.permissions import require_admin_user
 from app.core.security import decode_access_token
 from app.integrations.database import DatabaseSessionManagerProtocol
-from app.modules.mcp.schemas import McpPrincipal
-from app.modules.mcp.service import McpService
 from app.modules.users.service import UserService
 
 settings = get_settings()
@@ -56,12 +54,8 @@ def get_user_service(manager: DbManagerDep) -> UserService:
     return UserService(manager)
 
 
-def get_mcp_service(manager: DbManagerDep, hub: NotificationHubDep) -> McpService:
-    return McpService(manager, hub)
-
 
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
-McpServiceDep = Annotated[McpService, Depends(get_mcp_service)]
 
 
 async def get_current_user(
@@ -89,16 +83,4 @@ def get_admin_user(current_user: CurrentUserDep) -> Any:
 AdminUserDep = Annotated[Any, Depends(get_admin_user)]
 
 
-async def get_mcp_principal(
-    service: McpServiceDep,
-    authorization: Annotated[str | None, Header()] = None,
-) -> McpPrincipal:
-    if not authorization or not authorization.lower().startswith("bearer "):
-        raise UnauthorizedError("MCP bearer key is required")
-    raw_key = authorization.split(" ", 1)[1].strip()
-    if not raw_key:
-        raise UnauthorizedError("MCP bearer key is empty")
-    return await service.authenticate(raw_key)
 
-
-McpPrincipalDep = Annotated[McpPrincipal, Depends(get_mcp_principal)]
