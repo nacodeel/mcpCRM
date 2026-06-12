@@ -35,8 +35,21 @@ def get_db_and_hub(ctx: Context) -> tuple[Any, Any]:
     db = build_database_manager(settings)
     return db, None
 
-def check_auth(required_scope: str) -> McpPrincipal:
+async def check_auth(required_scope: str, ctx: Context) -> McpPrincipal:
     principal = current_mcp_principal.get()
+    if principal is None:
+        import os
+        env_key = os.environ.get("MCP_API_KEY") or os.environ.get("MCP_KEY")
+        if env_key:
+            db, notifications = get_db_and_hub(ctx)
+            from app.modules.mcp.service import McpService
+            service = McpService(db, notifications)
+            try:
+                principal = await service.authenticate(env_key)
+                current_mcp_principal.set(principal)
+            except Exception as e:
+                raise ValueError(f"Failed to authenticate key from environment: {e}")
+
     if principal is None:
         raise ValueError("Not authenticated. Please specify a valid MCP key.")
     require_scope(principal.scopes, required_scope)
@@ -45,7 +58,7 @@ def check_auth(required_scope: str) -> McpPrincipal:
 @mcp.tool()
 async def crm_contacts_list(ctx: Context, page: int = 1, per_page: int = 50) -> dict[str, Any]:
     """List CRM contacts for the authenticated user."""
-    principal = check_auth("contacts:read")
+    principal = await check_auth("contacts:read", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
     data = await crm.list_contacts(principal.user_id, page=page, per_page=per_page)
@@ -60,7 +73,7 @@ async def crm_contacts_create(
     email: str | None = None,
 ) -> dict[str, Any]:
     """Create a CRM contact and notify connected frontend clients."""
-    principal = check_auth("contacts:write")
+    principal = await check_auth("contacts:write", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
 
@@ -86,7 +99,7 @@ async def crm_contacts_update(
     email: str | None = None,
 ) -> dict[str, Any]:
     """Update an existing CRM contact."""
-    principal = check_auth("contacts:write")
+    principal = await check_auth("contacts:write", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
 
@@ -102,7 +115,7 @@ async def crm_contacts_update(
 @mcp.tool()
 async def crm_contacts_delete(ctx: Context, contact_id: int) -> dict[str, Any]:
     """Delete a CRM contact."""
-    principal = check_auth("contacts:write")
+    principal = await check_auth("contacts:write", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
     await crm.delete_contact(principal.user_id, contact_id)
@@ -111,7 +124,7 @@ async def crm_contacts_delete(ctx: Context, contact_id: int) -> dict[str, Any]:
 @mcp.tool()
 async def crm_deals_list(ctx: Context, page: int = 1, per_page: int = 50) -> dict[str, Any]:
     """List CRM deals for the authenticated user."""
-    principal = check_auth("contacts:read")
+    principal = await check_auth("contacts:read", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
     data = await crm.list_deals(principal.user_id, page=page, per_page=per_page)
@@ -126,7 +139,7 @@ async def crm_deals_create(
     description: str | None = None,
 ) -> dict[str, Any]:
     """Create a CRM deal and notify connected frontend clients."""
-    principal = check_auth("contacts:write")
+    principal = await check_auth("contacts:write", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
 
@@ -149,7 +162,7 @@ async def crm_deals_update(
     status: str | None = None,
 ) -> dict[str, Any]:
     """Update an existing CRM deal."""
-    principal = check_auth("contacts:write")
+    principal = await check_auth("contacts:write", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
 
@@ -165,7 +178,7 @@ async def crm_deals_update(
 @mcp.tool()
 async def crm_deals_delete(ctx: Context, deal_id: int) -> dict[str, Any]:
     """Delete a CRM deal."""
-    principal = check_auth("contacts:write")
+    principal = await check_auth("contacts:write", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
     await crm.delete_deal(principal.user_id, deal_id)
@@ -174,7 +187,7 @@ async def crm_deals_delete(ctx: Context, deal_id: int) -> dict[str, Any]:
 @mcp.tool()
 async def crm_search(ctx: Context, query: str, limit: int = 20) -> dict[str, Any]:
     """Search CRM contacts and deals."""
-    principal = check_auth("contacts:read")
+    principal = await check_auth("contacts:read", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
     data = await crm.search_all(principal.user_id, query=query, limit=limit)
@@ -183,7 +196,7 @@ async def crm_search(ctx: Context, query: str, limit: int = 20) -> dict[str, Any
 @mcp.tool()
 async def crm_dashboard(ctx: Context) -> dict[str, Any]:
     """Read CRM dashboard metrics."""
-    principal = check_auth("contacts:read")
+    principal = await check_auth("contacts:read", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
     data = await crm.dashboard(principal.user_id)

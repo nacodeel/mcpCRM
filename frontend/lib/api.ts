@@ -55,7 +55,7 @@ export class CrmApiClient {
     return `${wsBase}/api/v1/notifications/ws?token=${encodeURIComponent(token)}`;
   }
 
-  private static getToken(): string | null {
+  static getToken(): string | null {
     if (typeof window === 'undefined') return null;
     return window.localStorage.getItem('access_token') || window.localStorage.getItem('crm_access_token');
   }
@@ -74,20 +74,81 @@ export class CrmApiClient {
     if (!token) throw new Error('Токен доступа не найден.');
 
     const backendUrl = this.getBackendUrl();
-    const response = await fetch(`${backendUrl}${path}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        ...(options.headers || {}),
-      },
-    });
+    let response;
+    try {
+      response = await fetch(`${backendUrl}${path}`, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          ...(options.headers || {}),
+        },
+      });
+    } catch (networkError: any) {
+      throw new Error(`Ошибка сети: ${networkError.message || 'не удалось связаться с сервером.'}`);
+    }
 
-    const raw = (await response.json()) as BackendEnvelope<T>;
+    if (response.status === 401 || response.status === 403) {
+      this.logout();
+    }
+
+    let raw;
+    try {
+      raw = (await response.json()) as BackendEnvelope<T>;
+    } catch {
+      throw new Error(`Сервер вернул некорректный ответ (HTTP ${response.status})`);
+    }
+
     if (!response.ok || raw.error) {
-      throw new Error(raw.error?.message || `HTTP error! status: ${response.status}`);
+      throw new Error(raw.error?.message || (raw as any).detail || `Ошибка сервера! (Код: ${response.status})`);
     }
     return (raw.success ? raw.data : raw) as T;
+  }
+
+  static async login(username: string, password: string): Promise<ApiResponse<string>> {
+    try {
+      const backendUrl = this.getBackendUrl();
+      const params = new URLSearchParams();
+      params.append('username', username);
+      params.append('password', password);
+
+      const response = await fetch(`${backendUrl}/api/v1/auth/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params.toString(),
+      });
+
+      if (!response.ok) {
+        let errMsg = 'Неверный логин или пароль';
+        try {
+          const errData = await response.json();
+          errMsg = errData.detail || errData.error?.message || errMsg;
+        } catch {}
+        throw new Error(errMsg);
+      }
+
+      const raw = await response.json();
+      const token = raw.access_token;
+      if (!token) {
+        throw new Error('Токен не получен с сервера');
+      }
+
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('access_token', token);
+      }
+      return { success: true, data: token };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Ошибка входа' };
+    }
+  }
+
+  static logout(): void {
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('access_token');
+      window.localStorage.removeItem('crm_access_token');
+    }
   }
 
   private static normalizePage<T>(payload: any): T[] {

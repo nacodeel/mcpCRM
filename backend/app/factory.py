@@ -32,6 +32,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if settings.AUTO_CREATE_DATABASE:
         await db_manager.init_database()
 
+    # Automatically seed the database if it is empty
+    from app.core.seeding import bootstrap_database
+    try:
+        await bootstrap_database(db_manager)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("Failed to bootstrap database: %s", exc)
+
     setup_telemetry(app, settings)
 
     try:

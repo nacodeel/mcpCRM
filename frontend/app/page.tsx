@@ -24,6 +24,14 @@ export default function CRMPage() {
   const [loading, setLoading] = React.useState(true);
   const [currentSection, setCurrentSection] = React.useState<CRMSection>('dashboard');
 
+  // Authentication states
+  const [hasBackendToken, setHasBackendToken] = React.useState(false);
+  const [loginModalOpen, setLoginModalOpen] = React.useState(false);
+  const [loginUsername, setLoginUsername] = React.useState('');
+  const [loginPassword, setLoginPassword] = React.useState('');
+  const [loginError, setLoginError] = React.useState('');
+  const [isSubmittingLogin, setIsSubmittingLogin] = React.useState(false);
+
   // URL extraction for API instructions
   const [originUrl, setOriginUrl] = React.useState('https://your-crm.app');
 
@@ -125,11 +133,16 @@ export default function CRMPage() {
   const fetchDB = React.useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
+      const token = CrmApiClient.getToken();
+      setHasBackendToken(!!token);
       const response = await CrmApiClient.getDatabase();
       if (response.success && response.data) {
         setDb(response.data);
       } else {
         if (!silent) showToast(response.error || 'Не удалось загрузить данные CRM.', 'error');
+        if (token && !CrmApiClient.getToken()) {
+          setHasBackendToken(false);
+        }
       }
     } catch {
       if (!silent) showToast('Сбой подключения к серверу.', 'error');
@@ -208,6 +221,36 @@ export default function CRMPage() {
       }
     } catch (err: any) {
       showToast(err.message || 'Ошибка сети при синхронизации.', 'error');
+    }
+  };
+
+  const handleLogout = React.useCallback(() => {
+    CrmApiClient.logout();
+    setHasBackendToken(false);
+    showToast('Вы вышли из системы. Включен демо-режим.', 'success');
+    fetchDB();
+  }, [fetchDB, showToast]);
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    setIsSubmittingLogin(true);
+    try {
+      const res = await CrmApiClient.login(loginUsername, loginPassword);
+      if (res.success) {
+        setHasBackendToken(true);
+        setLoginModalOpen(false);
+        setLoginUsername('');
+        setLoginPassword('');
+        showToast('Успешный вход на сервер!', 'success');
+        fetchDB();
+      } else {
+        setLoginError(res.error || 'Неверные учетные данные');
+      }
+    } catch (err: any) {
+      setLoginError(err.message || 'Ошибка подключения');
+    } finally {
+      setIsSubmittingLogin(false);
     }
   };
 
@@ -852,6 +895,44 @@ export default function CRMPage() {
         
         {/* GLOBAL HEADER BAR WITH INTEGRATIONS */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end bg-white border border-[#EDEDED] py-2.5 px-4 rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.01)] gap-3 select-none mb-6">
+            {/* Connection state / Auth indicator */}
+            <div className="flex items-center gap-2 border-r border-[#EDEDED] pr-3 mr-1">
+              <span className="text-[11px] md:text-xs text-neutral-400 font-medium whitespace-nowrap">Режим:</span>
+              {hasBackendToken ? (
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] md:text-xs font-semibold px-2 py-0.5 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Сервер (Postgres)
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-[10px] md:text-xs text-red-500 hover:text-red-600 hover:bg-red-50 py-0.5 px-1.5 h-7"
+                    onClick={handleLogout}
+                  >
+                    Выйти
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-800 text-[10px] md:text-xs font-semibold px-2 py-0.5 rounded-full">
+                    Демо (Локально)
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-[10px] md:text-xs text-[#1A1A1A] hover:bg-[#F5F5F4] py-0.5 px-2.5 h-7 border border-[#EDEDED]"
+                    onClick={() => {
+                      setLoginError('');
+                      setLoginModalOpen(true);
+                    }}
+                  >
+                    Подключить сервер
+                  </Button>
+                </div>
+              )}
+            </div>
+
             {/* Right dropdown currency display */}
             <div className="flex items-center gap-2">
               <span className="text-[11px] md:text-xs text-neutral-400 font-medium whitespace-nowrap">Валюта CRM:</span>
@@ -1608,6 +1689,70 @@ export default function CRMPage() {
       {/* ========================================= */}
       {/* 3. MODALS AND SHEET COMPONENT WRAPPERS */}
       {/* ========================================= */}
+
+      {/* LOGIN MODAL */}
+      <ResponsiveModal
+        isOpen={loginModalOpen}
+        onClose={() => setLoginModalOpen(false)}
+        title="Авторизация на сервере"
+        className="max-w-md"
+      >
+        <form onSubmit={handleLoginSubmit} className="space-y-4 font-normal text-sm">
+          <p className="text-xs text-neutral-405 leading-normal mb-2 text-neutral-500">
+            Введите имя пользователя и пароль для подключения к базе данных PostgreSQL.
+            Используйте учетные данные по умолчанию (<code className="font-mono text-neutral-800 bg-neutral-100 px-1 rounded">admin</code> / <code className="font-mono text-neutral-800 bg-neutral-100 px-1 rounded">adminpassword</code>), если вы запускаете сервер впервые.
+          </p>
+
+          {loginError && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 text-red-800 text-xs rounded-lg">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{loginError}</span>
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Имя пользователя</label>
+            <Input
+              type="text"
+              required
+              value={loginUsername}
+              onChange={(e) => setLoginUsername(e.target.value)}
+              placeholder="admin"
+              disabled={isSubmittingLogin}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Пароль</label>
+            <Input
+              type="password"
+              required
+              value={loginPassword}
+              onChange={(e) => setLoginPassword(e.target.value)}
+              placeholder="••••••••"
+              disabled={isSubmittingLogin}
+            />
+          </div>
+
+          <div className="pt-2 flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setLoginModalOpen(false)}
+              disabled={isSubmittingLogin}
+            >
+              Отмена
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              loading={isSubmittingLogin}
+            >
+              Войти
+            </Button>
+          </div>
+        </form>
+      </ResponsiveModal>
 
       {/* CONTACTS CREATE / EDIT VIEW */}
       <ResponsiveModal
