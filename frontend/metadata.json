@@ -1,0 +1,6 @@
+{
+  "name": "Mini CRM",
+  "description": "Минималистичная CRM для контактов и сделок с интеграцией для AI-агентов",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
