@@ -1,13 +1,24 @@
 from typing import Any
 
+from app.core.events import NotificationHub
 from app.core.exceptions import NotFoundError
 from app.integrations.database import DatabaseSessionManagerProtocol
-from app.modules.crm.schemas import ContactCreateRequest, ContactUpdateRequest, DealCreateRequest
+from app.modules.crm.schemas import (
+    ContactCreateRequest,
+    ContactUpdateRequest,
+    DealCreateRequest,
+    DealUpdateRequest,
+)
 
 
 class CrmService:
-    def __init__(self, db: DatabaseSessionManagerProtocol):
+    def __init__(
+        self,
+        db: DatabaseSessionManagerProtocol,
+        notifications: NotificationHub | None = None,
+    ) -> None:
         self.db = db
+        self.notifications = notifications
 
     async def list_contacts(self, user_id: int, *, page: int = 1, per_page: int = 50) -> Any:
         async with self.db.crud() as crud:
@@ -17,7 +28,9 @@ class CrmService:
             if hasattr(contacts, "page_by_user"):
                 return await contacts.page_by_user(user_id, page=page, per_page=per_page)
             if hasattr(contacts, "page"):
-                return await contacts.page(filter_by={"user_id": user_id}, page=page, per_page=per_page)
+                return await contacts.page(
+                    filter_by={"user_id": user_id}, page=page, per_page=per_page
+                )
             return await contacts.by_user(user_id)
 
     async def create_contact(self, user_id: int, payload: ContactCreateRequest) -> Any:
@@ -25,9 +38,18 @@ class CrmService:
             scenarios = getattr(crud, "scenarios", getattr(crud, "scenario", None))
             data = payload.model_dump(exclude_none=True)
             if scenarios is not None and hasattr(scenarios, "create_contact_full"):
-                return await scenarios.create_contact_full(user_id=user_id, **data)
-            contacts = getattr(crud, "contacts", getattr(crud, "contact", None))
-            return await contacts.create(user_id=user_id, **data)
+                contact = await scenarios.create_contact_full(user_id=user_id, **data)
+            else:
+                contacts = getattr(crud, "contacts", getattr(crud, "contact", None))
+                contact = await contacts.create(user_id=user_id, **data)
+        await self._publish(
+            user_id,
+            "crm.contact.created",
+            "Контакт создан",
+            f"Создан контакт #{getattr(contact, 'id', '')}",
+            {"contact_id": getattr(contact, "id", None)},
+        )
+        return contact
 
     async def get_contact(self, user_id: int, contact_id: int) -> Any:
         async with self.db.crud() as crud:
@@ -48,15 +70,39 @@ class CrmService:
         payload: ContactUpdateRequest,
     ) -> Any:
         async with self.db.transactional_crud() as crud:
+            contacts = getattr(crud, "contacts", getattr(crud, "contact", None))
+            existing = await contacts.get(contact_id)
+            if existing is None or getattr(existing, "user_id", user_id) != user_id:
+                raise NotFoundError("Contact not found")
             scenarios = getattr(crud, "scenarios", getattr(crud, "scenario", None))
             data = payload.model_dump(exclude_none=True)
             if scenarios is not None and hasattr(scenarios, "update_contact_full"):
-                return await scenarios.update_contact_full(contact_id=contact_id, **data)
+                contact = await scenarios.update_contact_full(contact_id=contact_id, **data)
+            else:
+                contact = await contacts.update(existing, **data)
+        await self._publish(
+            user_id,
+            "crm.contact.updated",
+            "Контакт обновлен",
+            f"Обновлен контакт #{contact_id}",
+            {"contact_id": contact_id},
+        )
+        return contact
+
+    async def delete_contact(self, user_id: int, contact_id: int) -> None:
+        async with self.db.transactional_crud() as crud:
             contacts = getattr(crud, "contacts", getattr(crud, "contact", None))
             contact = await contacts.get(contact_id)
             if contact is None or getattr(contact, "user_id", user_id) != user_id:
                 raise NotFoundError("Contact not found")
-            return await contacts.update(contact, **data)
+            await contacts.delete(contact)
+        await self._publish(
+            user_id,
+            "crm.contact.deleted",
+            "Контакт удален",
+            f"Удален контакт #{contact_id}",
+            {"contact_id": contact_id},
+        )
 
     async def list_deals(self, user_id: int, *, page: int = 1, per_page: int = 50) -> Any:
         async with self.db.crud() as crud:
@@ -64,21 +110,76 @@ class CrmService:
             if deals is None:
                 raise RuntimeError("database CRUD must expose deals repository")
             if hasattr(deals, "page"):
-                return await deals.page(filter_by={"user_id": user_id}, page=page, per_page=per_page)
+                return await deals.page(
+                    filter_by={"user_id": user_id}, page=page, per_page=per_page
+                )
             if hasattr(deals, "by_user"):
                 return await deals.by_user(user_id)
             raise RuntimeError("database deals repository must expose page or by_user")
 
     async def create_deal(self, user_id: int, payload: DealCreateRequest) -> Any:
         async with self.db.transactional_crud() as crud:
+            contacts = getattr(crud, "contacts", getattr(crud, "contact", None))
+            contact = await contacts.get(payload.contact_id)
+            if contact is None or getattr(contact, "user_id", user_id) != user_id:
+                raise NotFoundError("Contact not found")
             deals = getattr(crud, "deals", getattr(crud, "deal", None))
             data = payload.model_dump(exclude_none=True)
-            return await deals.create(user_id=user_id, **data)
+            deal = await deals.create(user_id=user_id, **data)
+        await self._publish(
+            user_id,
+            "crm.deal.created",
+            "Сделка создана",
+            f"Создана сделка #{getattr(deal, 'id', '')}",
+            {"deal_id": getattr(deal, "id", None), "contact_id": payload.contact_id},
+        )
+        return deal
+
+    async def update_deal(self, user_id: int, deal_id: int, payload: DealUpdateRequest) -> Any:
+        async with self.db.transactional_crud() as crud:
+            deals = getattr(crud, "deals", getattr(crud, "deal", None))
+            deal = await deals.get(deal_id)
+            if deal is None or getattr(deal, "user_id", user_id) != user_id:
+                raise NotFoundError("Deal not found")
+            data = payload.model_dump(exclude_none=True)
+            if "contact_id" in data:
+                contacts = getattr(crud, "contacts", getattr(crud, "contact", None))
+                contact = await contacts.get(data["contact_id"])
+                if contact is None or getattr(contact, "user_id", user_id) != user_id:
+                    raise NotFoundError("Contact not found")
+            deal = await deals.update(deal, **data)
+        await self._publish(
+            user_id,
+            "crm.deal.updated",
+            "Сделка обновлена",
+            f"Обновлена сделка #{deal_id}",
+            {"deal_id": deal_id},
+        )
+        return deal
+
+    async def delete_deal(self, user_id: int, deal_id: int) -> None:
+        async with self.db.transactional_crud() as crud:
+            deals = getattr(crud, "deals", getattr(crud, "deal", None))
+            deal = await deals.get(deal_id)
+            if deal is None or getattr(deal, "user_id", user_id) != user_id:
+                raise NotFoundError("Deal not found")
+            await deals.delete(deal)
+        await self._publish(
+            user_id,
+            "crm.deal.deleted",
+            "Сделка удалена",
+            f"Удалена сделка #{deal_id}",
+            {"deal_id": deal_id},
+        )
 
     async def get_deal(self, user_id: int, deal_id: int) -> Any:
         async with self.db.crud() as crud:
             deals = getattr(crud, "deals", getattr(crud, "deal", None))
-            deal = await deals.get_full(deal_id) if hasattr(deals, "get_full") else await deals.get(deal_id)
+            deal = (
+                await deals.get_full(deal_id)
+                if hasattr(deals, "get_full")
+                else await deals.get(deal_id)
+            )
             if deal is None or getattr(deal, "user_id", user_id) != user_id:
                 raise NotFoundError("Deal not found")
             return deal
@@ -103,3 +204,21 @@ class CrmService:
             if deals is not None and hasattr(deals, "search"):
                 result["deals"] = await deals.search(user_id, query, limit=limit)
             return result
+
+    async def _publish(
+        self,
+        user_id: int,
+        event_type: str,
+        title: str,
+        message: str,
+        payload: dict[str, object],
+    ) -> None:
+        if self.notifications is None:
+            return
+        await self.notifications.publish(
+            user_id=user_id,
+            event_type=event_type,
+            title=title,
+            message=message,
+            payload=payload,
+        )

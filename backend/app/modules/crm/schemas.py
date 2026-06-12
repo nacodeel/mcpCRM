@@ -44,5 +44,16 @@ class DealCreateRequest(BaseModel):
     close_date: date | None = None
 
 
+class DealUpdateRequest(BaseModel):
+    contact_id: int | None = None
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
+    amount: Decimal | None = None
+    currency: str | None = Field(default=None, max_length=10)
+    comment: str | None = None
+    status: str | None = None
+    close_date: date | None = None
+
+
 class RawDatabaseResponse(BaseModel):
     data: Any

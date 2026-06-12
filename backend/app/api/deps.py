@@ -5,6 +5,7 @@ from fastapi import Depends, Header, Request
 from fastapi.security import OAuth2PasswordBearer
 
 from app.core.config import get_settings
+from app.core.events import NotificationHub
 from app.core.exceptions import UnauthorizedError
 from app.core.permissions import require_admin_user
 from app.core.security import decode_access_token
@@ -27,6 +28,16 @@ def get_db_manager(request: Request) -> DatabaseSessionManagerProtocol:
 DbManagerDep = Annotated[DatabaseSessionManagerProtocol, Depends(get_db_manager)]
 
 
+def get_notification_hub(request: Request) -> NotificationHub:
+    hub = getattr(request.app.state, "notifications", None)
+    if hub is None:
+        raise RuntimeError("Notification hub is not initialized")
+    return hub
+
+
+NotificationHubDep = Annotated[NotificationHub, Depends(get_notification_hub)]
+
+
 async def get_crud(manager: DbManagerDep) -> AsyncIterator[Any]:
     async with manager.crud() as crud:
         yield crud
@@ -45,8 +56,8 @@ def get_user_service(manager: DbManagerDep) -> UserService:
     return UserService(manager)
 
 
-def get_mcp_service(manager: DbManagerDep) -> McpService:
-    return McpService(manager)
+def get_mcp_service(manager: DbManagerDep, hub: NotificationHubDep) -> McpService:
+    return McpService(manager, hub)
 
 
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
