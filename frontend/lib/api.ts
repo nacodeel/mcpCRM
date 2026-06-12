@@ -85,6 +85,10 @@ export class CrmApiClient {
       }
     }
 
+    if (response.status === 204) {
+      return {} as T;
+    }
+
     let raw;
     try {
       raw = (await response.json()) as BackendEnvelope<T>;
