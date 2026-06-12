@@ -76,6 +76,15 @@ class CrmService:
                 raise NotFoundError("Contact not found")
             scenarios = getattr(crud, "scenarios", getattr(crud, "scenario", None))
             data = payload.model_dump(exclude_none=True)
+            if "phones" in data:
+                data["phones_to_add"] = data.pop("phones")
+            if "emails" in data:
+                data["emails_to_add"] = data.pop("emails")
+            if "addresses" in data:
+                data["addresses_to_add"] = data.pop("addresses")
+            if "tags" in data:
+                data["tags_to_add"] = data.pop("tags")
+
             if scenarios is not None and hasattr(scenarios, "update_contact_full"):
                 contact = await scenarios.update_contact_full(contact_id=contact_id, **data)
             else:
