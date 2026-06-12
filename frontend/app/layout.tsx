@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css'; // Global styles
 import { ToastProvider } from '@/components/ui';
+import { CRMProvider } from '@/context/crm-context';
 
 export const metadata: Metadata = {
   title: 'Mini CRM',
@@ -12,9 +13,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ru">
       <body className="bg-[#F9F9F8] font-sans text-[#1A1A1A] antialiased min-h-screen" suppressHydrationWarning>
         <ToastProvider>
-          {children}
+          <CRMProvider>
+            {children}
+          </CRMProvider>
         </ToastProvider>
       </body>
     </html>
   );
 }
+
