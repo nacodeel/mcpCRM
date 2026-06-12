@@ -82,12 +82,20 @@ def register_exception_handlers(app: FastAPI) -> None:
         request: Request,
         exc: RequestValidationError,
     ) -> ORJSONResponse:
+        errors = exc.errors()
+        # Build a human-readable message from the first error
+        first_msg = "Request validation error"
+        if errors:
+            first = errors[0]
+            loc = " -> ".join(str(l) for l in first.get("loc", []) if l != "body")
+            msg = first.get("msg", "")
+            first_msg = f"{loc}: {msg}" if loc else msg
         return ORJSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content=error_payload(
                 code="validation_error",
-                message="Request validation error",
-                details={"errors": exc.errors()},
+                message=first_msg,
+                details={"errors": errors},
                 request_id=getattr(request.state, "request_id", None),
             ),
         )

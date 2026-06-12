@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Plus, Search, SlidersHorizontal, Trash2, Edit3, Copy, Eye, EyeOff,
   RefreshCw, User, Mail, Phone, MapPin, Calendar, TrendingUp, Wallet,
-  Check, X, FileText, ArrowRight, CheckCircle2, AlertCircle, Sparkles, HelpCircle
+  Check, X, FileText, ArrowRight, CheckCircle2, AlertCircle, Sparkles, HelpCircle,
+  ShieldAlert, KeyRound
 } from 'lucide-react';
 import { useToast, Button, Input, Textarea, Select, Badge, Skeleton, ConfirmDialog, CustomDropdown } from '@/components/ui';
 import { Sidebar, CRMSection } from '@/components/sidebar';
@@ -23,6 +24,13 @@ export default function CRMPage() {
   const [db, setDb] = React.useState<CRMDatabase | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [currentSection, setCurrentSection] = React.useState<CRMSection>('dashboard');
+
+  // MCP Keys states
+  const [mcpKeys, setMcpKeys] = React.useState<any[]>([]);
+  const [newMcpKeyName, setNewMcpKeyName] = React.useState('');
+  const [newMcpKeyScopes, setNewMcpKeyScopes] = React.useState<string[]>([]);
+  const [mcpKeyLoading, setMcpKeyLoading] = React.useState(false);
+  const [newRawToken, setNewRawToken] = React.useState<string | null>(null);
 
   // Authentication states
   const [hasBackendToken, setHasBackendToken] = React.useState(false);
@@ -57,8 +65,6 @@ export default function CRMPage() {
   const [newAddressInput, setNewAddressInput] = React.useState('');
   const [newTagInput, setNewTagInput] = React.useState('');
 
-  // API Block states
-  const [showApiKey, setShowApiKey] = React.useState(false);
 
 
   // --- PUSH NOTIFICATION SYSTEM ---
@@ -144,6 +150,51 @@ export default function CRMPage() {
     }
   }, [showToast]);
 
+  const fetchMcpKeys = React.useCallback(async () => {
+    setMcpKeyLoading(true);
+    const keysRes = await CrmApiClient.listMcpKeys();
+    if (keysRes.success && keysRes.data) {
+      setMcpKeys(keysRes.data);
+    } else if (keysRes.error) {
+      showToast(keysRes.error, 'error');
+    }
+    setMcpKeyLoading(false);
+  }, [showToast]);
+
+  React.useEffect(() => {
+    if (currentSection === 'integration' && hasBackendToken) {
+      fetchMcpKeys();
+    }
+  }, [currentSection, hasBackendToken, fetchMcpKeys]);
+
+  const handleCreateMcpKey = async () => {
+    if (!newMcpKeyName.trim()) {
+      showToast('Введите название ключа', 'error');
+      return;
+    }
+    const res = await CrmApiClient.createMcpKey(newMcpKeyName, newMcpKeyScopes);
+    if (res.success && res.data) {
+      setNewRawToken(res.data.raw_token);
+      setNewMcpKeyName('');
+      setNewMcpKeyScopes([]);
+      showToast('Ключ успешно создан', 'success');
+      fetchMcpKeys();
+    } else {
+      showToast(res.error || 'Ошибка при создании ключа', 'error');
+    }
+  };
+
+  const handleDeleteMcpKey = async (id: number) => {
+    if (!confirm('Вы уверены, что хотите отозвать этот ключ?')) return;
+    const res = await CrmApiClient.deleteMcpKey(id);
+    if (res.success) {
+      showToast('Ключ отозван', 'success');
+      fetchMcpKeys();
+    } else {
+      showToast(res.error || 'Ошибка при удалении', 'error');
+    }
+  };
+
   React.useEffect(() => {
     let active = true;
     setTimeout(() => {
@@ -195,8 +246,8 @@ export default function CRMPage() {
           result = await CrmApiClient.deleteDeal(payload.id);
           break;
         case 'regenerate_apiKey':
-          result = await CrmApiClient.regenerateApiKey();
-          break;
+          showToast('Для управления ключами перейдите в раздел "Интеграции".', 'info');
+          return;
         case 'update_profile':
           result = await CrmApiClient.updateProfile(payload);
           break;
@@ -304,6 +355,9 @@ export default function CRMPage() {
     setSelectedContact({
       id: '',
       name: '',
+      firstName: '',
+      lastName: '',
+      middleName: '',
       phones: [],
       emails: [],
       addresses: [],
@@ -329,8 +383,8 @@ export default function CRMPage() {
   };
 
   const saveContactForm = async () => {
-    if (!selectedContact?.name?.trim()) {
-      showToast('Пожалуйста, введите имя контакта.', 'error');
+    if (!selectedContact?.firstName?.trim() && !selectedContact?.lastName?.trim() && !selectedContact?.name?.trim()) {
+      showToast('Пожалуйста, введите Имя или Фамилию.', 'error');
       return;
     }
     const label = editContactMode === 'create' ? 'создан' : 'изменен';
@@ -1568,142 +1622,96 @@ export default function CRMPage() {
                 description="Интеграция сторонних ИИ помощников, ботов продаж и лидогенераторов напрямую в CRM через API."
               />
 
-              {/* API Security Block */}
-              <div className="bg-white border border-neutral-200/50 rounded-xl p-5 space-y-4 shadow-[0_1px_2px_rgba(0,0,0,0.01)] font-normal">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  <div className="space-y-1 max-w-xl">
-                    <h3 className="text-sm font-bold text-neutral-800 tracking-tight">Ваш секретный API-токен</h3>
-                    <p className="text-xs text-neutral-400 leading-normal">
-                      Используйте этот Bearer-токен во внешних системах для безопасной отправки лидов и сделок в вашу базу данных.
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="relative font-mono text-xs text-neutral-700 bg-neutral-55 px-3 py-2 border border-neutral-200 rounded-md min-w-[280px] flex items-center justify-between">
-                      <span className="truncate pr-4 mr-2">
-                        {showApiKey ? safeDb.apiKey : 'agent_crm_••••••••••••••••••••••••••••••••'}
-                      </span>
-                      <button
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="text-neutral-400 hover:text-neutral-600 transition-colors"
-                        title={showApiKey ? "Скрыть ключ" : "Показать ключ"}
-                      >
-                        {showApiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => copyToClipboard(safeDb.apiKey, 'API-токен')}
-                      title="Копировать токен"
-                    >
-                      <Copy className="w-3.5 h-3.5 text-neutral-500" />
-                    </Button>
-
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-500 hover:bg-red-50 hover:text-red-600"
-                      onClick={() => setRegenerateConfirmOpen(true)}
-                      title="Перевыпустить токен"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                    </Button>
+              {/* MCP Keys Management */}
+              <div className="bg-white border border-neutral-200/50 rounded-xl p-6 shadow-[0_1px_2px_rgba(0,0,0,0.01)] font-normal space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-neutral-100 pb-4">
+                  <div>
+                    <h3 className="text-base font-bold text-neutral-800">Управление ключами доступа</h3>
+                    <p className="text-xs text-neutral-500 mt-1 max-w-lg">Создайте ключи (API Tokens) для ваших AI-агентов. Вы можете выпустить до 10 активных ключей.</p>
                   </div>
                 </div>
+
+                {/* Create Key Form */}
+                <div className="flex flex-col sm:flex-row items-end gap-3 bg-neutral-50 p-4 rounded-lg border border-neutral-100">
+                  <div className="flex-1 w-full space-y-1.5">
+                    <label className="text-xs font-semibold text-neutral-600 uppercase tracking-wide">Название ключа</label>
+                    <Input
+                      value={newMcpKeyName}
+                      onChange={(e) => setNewMcpKeyName(e.target.value)}
+                      placeholder="Например: Агент поддержки"
+                      maxLength={120}
+                    />
+                  </div>
+                  <Button onClick={handleCreateMcpKey} disabled={!newMcpKeyName.trim()} variant="primary" className="w-full sm:w-auto h-10">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Выпустить ключ
+                  </Button>
+                </div>
+
+                {/* Keys List */}
+                {mcpKeyLoading ? (
+                  <div className="py-8 text-center text-sm text-neutral-500 animate-pulse">Загрузка ключей...</div>
+                ) : mcpKeys.length === 0 ? (
+                  <div className="py-8 text-center bg-neutral-50 rounded-lg border border-neutral-100 border-dashed">
+                    <ShieldAlert className="w-8 h-8 text-neutral-300 mx-auto mb-2" />
+                    <h4 className="text-sm font-semibold text-neutral-700">Нет активных ключей</h4>
+                    <p className="text-xs text-neutral-500 mt-1">Выпустите первый ключ для подключения AI-агента</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border border-neutral-200">
+                    <table className="w-full text-left border-collapse text-sm">
+                      <thead>
+                        <tr className="bg-neutral-50 border-b border-neutral-200 text-xs text-neutral-500 uppercase tracking-wider font-semibold">
+                          <th className="px-4 py-3 font-medium">Название</th>
+                          <th className="px-4 py-3 font-medium">Роли / Scopes</th>
+                          <th className="px-4 py-3 font-medium">Создан</th>
+                          <th className="px-4 py-3 font-medium">Последнее исп.</th>
+                          <th className="px-4 py-3 font-medium text-right">Действия</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-100 bg-white">
+                        {mcpKeys.map((k) => (
+                          <tr key={k.id} className="hover:bg-neutral-50/50 transition-colors">
+                            <td className="px-4 py-3 font-medium text-neutral-800">
+                              <div className="flex items-center gap-2">
+                                <div className={'w-2 h-2 rounded-full ' + (k.is_active ? 'bg-emerald-500' : 'bg-red-500')} />
+                                {k.name}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              {k.scopes?.length ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {k.scopes.map((s: string) => (
+                                    <span key={s} className="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">{s}</span>
+                                  ))}
+                                </div>
+                              ) : <span className="text-neutral-400 text-xs italic">Полный доступ</span>}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-neutral-500 whitespace-nowrap">
+                              {new Date(k.created_at).toLocaleDateString('ru-RU')}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-neutral-500 whitespace-nowrap">
+                              {k.last_used_at ? new Date(k.last_used_at).toLocaleDateString('ru-RU') : 'Никогда'}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-500 hover:text-red-600 hover:bg-red-50 h-8 px-2"
+                                onClick={() => handleDeleteMcpKey(k.id)}
+                                disabled={!k.is_active}
+                              >
+                                Отозвать
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-
-              {/* Developer Documentation Section */}
-              <div className="space-y-6">
-                {/* 1. Create Contact Endpoint */}
-                <div className="bg-white border border-neutral-200/50 rounded-xl p-5 space-y-4 shadow-[0_1px_2px_rgba(0,0,0,0.01)] font-normal">
-                  <div className="space-y-2">
-                    <span className="text-[11px] font-semibold tracking-wider text-neutral-400 uppercase">1. Автоматическое добавление контакта / лида (с опциональной сделкой)</span>
-                    <div className="flex items-center text-xs text-neutral-500 gap-2">
-                      <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-bold rounded">POST</span>
-                      <code className="font-mono text-[11px] font-medium text-neutral-700 truncate">{originUrl}/api/contacts</code>
-                    </div>
-                    <p className="text-xs text-neutral-500 max-w-2xl leading-relaxed">
-                      Используйте этот эндпоинт для мгновенной регистрации лидов с ваших форм, сайтов, или чат-ботов. При передаче полей <code className="text-neutral-800 bg-neutral-100 font-mono text-[10px] px-1 rounded">dealTitle</code> и <code className="text-neutral-800 bg-neutral-100 font-mono text-[10px] px-1 rounded">amount</code>, эндпоинт также автоматически свяжет с ним активную сделку.
-                    </p>
-                  </div>
-
-                  <div className="relative group rounded-lg overflow-hidden border border-neutral-200 bg-neutral-900 shadow">
-                    <div className="flex items-center justify-between px-4 py-1.5 bg-neutral-800 text-neutral-400 font-mono text-[10px] select-none border-b border-neutral-800">
-                      <span>CURL REQUEST (CONTACT WITH OPTIONAL DEAL)</span>
-                      <button
-                        onClick={() => copyToClipboard(
-                          `curl -X POST "${originUrl}/api/contacts" \\\n  -H "Authorization: Bearer ${safeDb.apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "name": "Александра Кириллова",\n    "phone": "+7 (999) 111-22-33",\n    "email": "alex@company.ru",\n    "address": "Москва, Пресненская наб. 12",\n    "tags": ["AI-Лид", "Крупный бизнес"],\n    "notes": "Оставила заявку на интеграцию с AI-телефонией",\n    "dealTitle": "Интеграция ИИ-оператора",\n    "amount": 450000,\n    "status": "Новая"\n  }'`,
-                          'Пример Curl контакта'
-                        )}
-                        className="hover:text-white p-1 rounded hover:bg-neutral-700 transition-colors flex items-center gap-1 font-sans text-[9px] font-semibold uppercase tracking-wider"
-                      >
-                        <Copy className="w-3 h-3" />
-                        Копировать
-                      </button>
-                    </div>
-                    <pre className="p-4 text-[11px] font-mono text-neutral-300 overflow-x-auto leading-relaxed scrollbar-thin">
-{`curl -X POST "${originUrl}/api/contacts" \\
-  -H "Authorization: Bearer ${showApiKey ? safeDb.apiKey : 'agent_crm_•••••••••••••••••••••••••'}" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "name": "Александра Кириллова",
-    "phone": "+7 (999) 111-22-33",
-    "email": "alex@company.ru",
-    "address": "Москва, Пресненская наб. 12",
-    "tags": ["AI-Лид", "Крупный бизнес"],
-    "notes": "Оставила заявку на интеграцию с AI-телефонией",
-    "dealTitle": "Интеграция ИИ-оператора",
-    "amount": 450000,
-    "status": "Новая"
-  }'`}
-                    </pre>
-                  </div>
-                </div>
-
-                {/* 2. Create Deal Only Endpoint */}
-                <div className="bg-white border border-neutral-200/50 rounded-xl p-5 space-y-4 shadow-[0_1px_2px_rgba(0,0,0,0.01)] font-normal">
-                  <div className="space-y-2">
-                    <span className="text-[11px] font-semibold tracking-wider text-neutral-400 uppercase">2. Создание сделки для существующего контакта</span>
-                    <div className="flex items-center text-xs text-neutral-500 gap-2">
-                      <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-bold rounded">POST</span>
-                      <code className="font-mono text-[11px] font-medium text-neutral-700 truncate">{originUrl}/api/deals</code>
-                    </div>
-                    <p className="text-xs text-neutral-500 max-w-2xl leading-relaxed">
-                      Используйте этот эндпоинт, чтобы добавить коммерческое предложение или новую сделку к уже существующему контакту по его уникальному идентификатору <code className="text-neutral-800 bg-neutral-100 font-mono text-[10px] px-1 rounded">contactId</code> (например, <code className="text-neutral-800 bg-neutral-100 font-mono text-[10px] px-1 rounded">c1</code>).
-                    </p>
-                  </div>
-
-                  <div className="relative group rounded-lg overflow-hidden border border-neutral-200 bg-neutral-900 shadow">
-                    <div className="flex items-center justify-between px-4 py-1.5 bg-neutral-800 text-neutral-400 font-mono text-[10px] select-none border-b border-neutral-800">
-                      <span>CURL REQUEST (DEAL ONLY)</span>
-                      <button
-                        onClick={() => copyToClipboard(
-                          `curl -X POST "${originUrl}/api/deals" \\\n  -H "Authorization: Bearer ${safeDb.apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "title": "Доп. соглашение AI-комплаенс",\n    "description": "Разработка модуля риск-менеджмента",\n    "amount": 350000,\n    "contactId": "c1",\n    "status": "В работе"\n  }'`,
-                          'Пример Curl сделке'
-                        )}
-                        className="hover:text-white p-1 rounded hover:bg-neutral-700 transition-colors flex items-center gap-1 font-sans text-[9px] font-semibold uppercase tracking-wider"
-                      >
-                        <Copy className="w-3 h-3" />
-                        Копировать
-                      </button>
-                    </div>
-                    <pre className="p-4 text-[11px] font-mono text-neutral-300 overflow-x-auto leading-relaxed scrollbar-thin">
-{`curl -X POST "${originUrl}/api/deals" \\
-  -H "Authorization: Bearer ${showApiKey ? safeDb.apiKey : 'agent_crm_•••••••••••••••••••••••••'}" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "title": "Доп. соглашение AI-комплаенс",
-    "description": "Разработка модуля риск-менеджмента",
-    "amount": 350000,
-    "contactId": "c1",
-    "status": "В работе"
-  }'`}
-                    </pre>
-                  </div>
-                </div>
-              </div>
+              {/* End of Integration UI */}
             </motion.div>
           )}
 
@@ -1715,9 +1723,34 @@ export default function CRMPage() {
       {/* 3. MODALS AND SHEET COMPONENT WRAPPERS */}
       {/* ========================================= */}
 
+      {/* NEW MCP TOKEN MODAL */}
+      <ResponsiveModal
+        isOpen={!!newRawToken}
+        onClose={() => setNewRawToken(null)}
+        title="Ваш новый ключ доступа"
+        className="max-w-md"
+      >
+        <div className="space-y-4 text-sm font-normal">
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg text-xs leading-relaxed">
+            <strong>Внимание:</strong> Скопируйте этот токен прямо сейчас. Он показан только один раз. В целях безопасности мы не храним его в открытом виде.
+          </div>
+          
+          <div className="relative font-mono text-xs text-neutral-800 bg-neutral-100 p-3 rounded-lg border border-neutral-200 break-all select-all">
+            {newRawToken}
+          </div>
 
-
-      {/* CONTACTS CREATE / EDIT VIEW */}
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" onClick={() => setNewRawToken(null)}>Закрыть</Button>
+            <Button variant="primary" onClick={() => {
+              copyToClipboard(newRawToken || '', 'API-токен');
+              setNewRawToken(null);
+            }}>
+              <Copy className="w-4 h-4 mr-2" />
+              Скопировать и закрыть
+            </Button>
+          </div>
+        </div>
+      </ResponsiveModal>      {/* CONTACTS CREATE / EDIT VIEW */}
       <ResponsiveModal
         isOpen={contactModalOpen}
         onClose={() => setContactModalOpen(false)}
@@ -1726,14 +1759,32 @@ export default function CRMPage() {
       >
         {selectedContact && (
           <div className="space-y-5 font-normal text-sm select-none">
-            {/* Main Name segment */}
-            <div className="space-y-1">
-              <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">ФИО Клиента <span className="text-red-500">*</span></label>
-              <Input
-                value={selectedContact.name || ''}
-                onChange={(e) => setSelectedContact({ ...selectedContact, name: e.target.value })}
-                placeholder="Иван Иванов"
-              />
+            {/* Name segments */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Фамилия <span className="text-red-500">*</span></label>
+                <Input
+                  value={selectedContact.lastName || ''}
+                  onChange={(e) => setSelectedContact({ ...selectedContact, lastName: e.target.value })}
+                  placeholder="Иванов"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Имя <span className="text-red-500">*</span></label>
+                <Input
+                  value={selectedContact.firstName || ''}
+                  onChange={(e) => setSelectedContact({ ...selectedContact, firstName: e.target.value })}
+                  placeholder="Иван"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Отчество</label>
+                <Input
+                  value={selectedContact.middleName || ''}
+                  onChange={(e) => setSelectedContact({ ...selectedContact, middleName: e.target.value })}
+                  placeholder="Иванович"
+                />
+              </div>
             </div>
 
             {/* PHONES MULTIPLE ARRAY VALUE - CUSTOM LIST */}

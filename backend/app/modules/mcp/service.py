@@ -45,6 +45,43 @@ class McpService:
                 name=getattr(key_obj, "name", None),
             )
 
+    async def list_keys(self, user_id: int) -> list[Any]:
+        async with self.db.crud() as crud:
+            keys = getattr(crud, "mcp_keys", None)
+            if not keys:
+                raise RuntimeError("database CRUD must expose mcp_keys")
+            return await keys.by_user(user_id)
+
+    async def create_key(self, user_id: int, payload: Any) -> tuple[Any, str]:
+        async with self.db.transactional_crud() as crud:
+            keys = getattr(crud, "mcp_keys", None)
+            if not keys:
+                raise RuntimeError("database CRUD must expose mcp_keys")
+            
+            existing = await keys.by_user(user_id, active_only=True)
+            if len(existing) >= 10:
+                raise BadRequestError("Maximum of 10 active keys allowed.")
+
+            key_obj, raw_token = await keys.create_key(
+                user_id=user_id,
+                name=payload.name,
+                scopes=payload.scopes,
+                expires_at=payload.expires_at,
+            )
+            return key_obj, raw_token
+
+    async def revoke_key(self, user_id: int, key_id: int) -> None:
+        async with self.db.transactional_crud() as crud:
+            keys = getattr(crud, "mcp_keys", None)
+            if not keys:
+                raise RuntimeError("database CRUD must expose mcp_keys")
+            
+            key_obj = await keys.get(key_id)
+            if not key_obj or getattr(key_obj, "user_id", None) != user_id:
+                raise UnauthorizedError("Key not found or access denied")
+                
+            await keys.revoke(key_id)
+
     async def ingest_contact(
         self,
         principal: McpPrincipal,

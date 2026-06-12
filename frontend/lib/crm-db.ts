@@ -2,6 +2,9 @@
 export interface Contact {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
+  middleName?: string;
   phones: string[];
   emails: string[];
   addresses: string[];

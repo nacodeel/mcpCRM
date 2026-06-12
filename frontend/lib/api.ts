@@ -197,6 +197,9 @@ export class CrmApiClient {
     return {
       id: String(contact.id),
       name: contact.full_name || [contact.last_name, contact.first_name, contact.middle_name].filter(Boolean).join(' ') || `Контакт #${contact.id}`,
+      firstName: contact.first_name || '',
+      lastName: contact.last_name || '',
+      middleName: contact.middle_name || '',
       phones,
       emails,
       addresses,
@@ -259,13 +262,20 @@ export class CrmApiClient {
   static async saveContact(contact: Partial<Contact>): Promise<ApiResponse<CRMDatabase>> {
     try {
       const body = {
-        ...this.splitName(contact.name),
+        first_name: contact.firstName || undefined,
+        last_name: contact.lastName || undefined,
+        middle_name: contact.middleName || undefined,
         phones: contact.phones || [],
         emails: contact.emails || [],
         addresses: contact.addresses || [],
         tags: contact.tags || [],
         note: contact.notes,
       };
+      
+      // Fallback: if only name is provided, split it
+      if (!contact.firstName && !contact.lastName && !contact.middleName && contact.name) {
+        Object.assign(body, this.splitName(contact.name));
+      }
       
       const isEdit = !!contact.id;
       if (isEdit) {
@@ -331,8 +341,34 @@ export class CrmApiClient {
     }
   }
 
-  static async regenerateApiKey(): Promise<ApiResponse<CRMDatabase>> {
-    return { success: false, error: 'Действие недоступно на сервере.' };
+  static async listMcpKeys(): Promise<ApiResponse<any[]>> {
+    try {
+      const keys = await this.backendRequest<any[]>('/api/v1/mcp_keys');
+      return { success: true, data: keys };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Ошибка загрузки ключей' };
+    }
+  }
+
+  static async createMcpKey(name: string, scopes: string[]): Promise<ApiResponse<any>> {
+    try {
+      const res = await this.backendRequest<any>('/api/v1/mcp_keys', {
+        method: 'POST',
+        body: JSON.stringify({ name, scopes }),
+      });
+      return { success: true, data: res };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Ошибка создания ключа' };
+    }
+  }
+
+  static async deleteMcpKey(keyId: number): Promise<ApiResponse<void>> {
+    try {
+      await this.backendRequest(`/api/v1/mcp_keys/${keyId}`, { method: 'DELETE' });
+      return { success: true, data: undefined };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Ошибка удаления ключа' };
+    }
   }
 
   static async updateProfile(profile: Partial<UserProfile>): Promise<ApiResponse<CRMDatabase>> {

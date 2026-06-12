@@ -2,6 +2,7 @@ from collections.abc import AsyncIterator
 from typing import Annotated, Any
 
 from fastapi import Depends, Header, Request
+from starlette.requests import HTTPConnection
 from fastapi.security import OAuth2PasswordBearer
 
 from app.core.config import get_settings
@@ -16,7 +17,7 @@ settings = get_settings()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_PREFIX}/auth/token")
 
 
-def get_db_manager(request: Request) -> DatabaseSessionManagerProtocol:
+def get_db_manager(request: HTTPConnection) -> DatabaseSessionManagerProtocol:
     manager = getattr(request.app.state, "db", None)
     if manager is None:
         raise RuntimeError("Database manager is not initialized")
@@ -26,7 +27,7 @@ def get_db_manager(request: Request) -> DatabaseSessionManagerProtocol:
 DbManagerDep = Annotated[DatabaseSessionManagerProtocol, Depends(get_db_manager)]
 
 
-def get_notification_hub(request: Request) -> NotificationHub:
+def get_notification_hub(request: HTTPConnection) -> NotificationHub:
     hub = getattr(request.app.state, "notifications", None)
     if hub is None:
         raise RuntimeError("Notification hub is not initialized")
