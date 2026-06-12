@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import func, select
 
 from ..enums import ContactStatus, DealStatus, UserRole
-from ..models.crm import Contact, Deal
+from ..models.crm import Contact, Deal, ContactPhone, ContactEmail, ContactAddress, ContactTag, ContactNote
 
 
 class CrmScenarioCRUD:
@@ -111,16 +111,30 @@ class CrmScenarioCRUD:
         }
         contact = await self.crud.contacts.update(contact, **update_data)
 
-        for phone in phones_to_add or []:
-            await self.crud.contact_phones.add_phone(contact_id=contact.id, phone=phone)
-        for email in emails_to_add or []:
-            await self.crud.contact_emails.add_email(contact_id=contact.id, email=email)
-        for address in addresses_to_add or []:
-            await self.crud.contact_addresses.add_address(contact_id=contact.id, address=address)
-        for tag in tags_to_add or []:
-            await self.crud.contact_tags.add_tag(contact.user_id, contact.id, tag)
-        if note:
-            await self.crud.contact_notes.add_note(user_id=contact.user_id, contact_id=contact.id, note=note)
+        if phones_to_add is not None:
+            await self.crud.contact_phones.delete_many(ContactPhone.contact_id == contact.id)
+            for index, phone in enumerate(phones_to_add):
+                await self.crud.contact_phones.add_phone(contact_id=contact.id, phone=phone, is_primary=index == 0)
+
+        if emails_to_add is not None:
+            await self.crud.contact_emails.delete_many(ContactEmail.contact_id == contact.id)
+            for index, email in enumerate(emails_to_add):
+                await self.crud.contact_emails.add_email(contact_id=contact.id, email=email, is_primary=index == 0)
+
+        if addresses_to_add is not None:
+            await self.crud.contact_addresses.delete_many(ContactAddress.contact_id == contact.id)
+            for index, address in enumerate(addresses_to_add):
+                await self.crud.contact_addresses.add_address(contact_id=contact.id, address=address, is_primary=index == 0)
+
+        if tags_to_add is not None:
+            await self.crud.contact_tags.delete_many(ContactTag.contact_id == contact.id)
+            for tag in tags_to_add:
+                await self.crud.contact_tags.add_tag(contact.user_id, contact.id, tag)
+
+        if note is not None:
+            await self.crud.contact_notes.delete_many(ContactNote.contact_id == contact.id)
+            if note.strip():
+                await self.crud.contact_notes.add_note(user_id=contact.user_id, contact_id=contact.id, note=note)
 
         await self.crud.flush()
         full = await self.crud.contacts.get_full(contact.id)

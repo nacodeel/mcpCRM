@@ -52,8 +52,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     try:
         if settings.MCP_AUTH_ENABLED:
-            async with mcp.session_manager.run():
+            if hasattr(mcp, "session_manager") and getattr(mcp.session_manager, "_has_started", False):
                 yield
+            else:
+                async with mcp.session_manager.run():
+                    yield
         else:
             yield
     finally:
