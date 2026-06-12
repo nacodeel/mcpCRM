@@ -31,3 +31,15 @@ class McpIngestContactRequest(BaseModel):
     tags: list[str] = Field(default_factory=list)
     note: str | None = None
     deal: dict[str, Any] | None = None
+
+
+class McpJsonRpcRequest(BaseModel):
+    jsonrpc: str = Field(default="2.0")
+    id: str | int | None = None
+    method: str
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class McpToolCallRequest(BaseModel):
+    name: str
+    arguments: dict[str, Any] = Field(default_factory=dict)

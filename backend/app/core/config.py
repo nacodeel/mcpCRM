@@ -39,6 +39,9 @@ class Settings(BaseSettings):
 
     MCP_AUTH_ENABLED: bool = True
 
+    NOTIFICATION_HISTORY_SIZE: int = 200
+    WEBSOCKET_HEARTBEAT_SECONDS: int = 25
+
     @field_validator("API_V1_PREFIX")
     @classmethod
     def normalize_api_prefix(cls, value: str) -> str:

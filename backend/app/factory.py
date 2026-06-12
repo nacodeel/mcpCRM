@@ -8,9 +8,14 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.router import api_router
 from app.core.config import Settings, get_settings
+from app.core.events import NotificationHub
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import setup_logging
-from app.core.middleware import ProcessTimeMiddleware, RequestIdMiddleware, SecurityHeadersMiddleware
+from app.core.middleware import (
+    ProcessTimeMiddleware,
+    RequestIdMiddleware,
+    SecurityHeadersMiddleware,
+)
 from app.integrations.database import build_database_manager
 from app.observability.telemetry import setup_telemetry
 
@@ -22,6 +27,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     db_manager = build_database_manager(settings)
     app.state.db = db_manager
+    app.state.notifications = NotificationHub(history_size=settings.NOTIFICATION_HISTORY_SIZE)
 
     if settings.AUTO_CREATE_DATABASE:
         await db_manager.init_database()

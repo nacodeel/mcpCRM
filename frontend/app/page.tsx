@@ -211,43 +211,49 @@ export default function CRMPage() {
     }
   };
 
-  // WebSocket background polling simulator
+  // Production WebSocket realtime synchronizer.
   React.useEffect(() => {
-    let active = true;
-    const timer = setInterval(() => {
-      if (!active) return;
-      if (!db || db.deals.length === 0) return;
+    let socket: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let closedByComponent = false;
 
-      // Only run simulation 40% of the time, and only if no modal forms are open to protect state fields
-      if (Math.random() > 0.4 || contactModalOpen || dealModalOpen) return;
+    const connect = () => {
+      const realtimeUrl = CrmApiClient.getRealtimeUrl();
+      if (!realtimeUrl || closedByComponent) return;
 
-      // Select random deal
-      const randomDealIndex = Math.floor(Math.random() * db.deals.length);
-      const deal = db.deals[randomDealIndex];
-      const changePercent = (Math.random() > 0.5 ? 1.05 : 0.95);
-      const newAmount = Math.round(deal.amount * changePercent);
+      socket = new WebSocket(realtimeUrl);
 
-      const updatedDeal = {
-        ...deal,
-        amount: newAmount,
-        updatedAt: new Date().toISOString()
+      socket.onmessage = async (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type !== 'notification' || !message.data) return;
+
+          triggerPush(message.data.title || 'CRM обновлена', message.data.message || 'Данные обновлены');
+          await fetchDB(true);
+        } catch (err) {
+          console.error('Realtime message handling failed:', err);
+        }
       };
 
-      triggerAction('save_deal', updatedDeal).then(() => {
-        const formattedNew = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: selectedCurrency.code, maximumFractionDigits: 0 }).format(newAmount * selectedCurrency.rate);
-        triggerPush(
-          "Входящее событие WebSocket",
-          `Автоматическое обновление по сокету: сумма сделки "${deal.title}" изменена на ${formattedNew}`
-        );
-      });
+      socket.onclose = () => {
+        if (!closedByComponent) {
+          reconnectTimer = setTimeout(connect, 3000);
+        }
+      };
 
-    }, 28000);
+      socket.onerror = () => {
+        socket?.close();
+      };
+    };
+
+    connect();
 
     return () => {
-      active = false;
-      clearInterval(timer);
+      closedByComponent = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      socket?.close();
     };
-  }, [db, contactModalOpen, dealModalOpen, triggerPush, selectedCurrency, triggerAction]);
+  }, [fetchDB, triggerPush]);
 
   // Contacts operations handlers
   const openCreateContact = () => {

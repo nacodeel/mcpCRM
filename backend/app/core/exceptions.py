@@ -3,6 +3,7 @@ from typing import Any
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import ORJSONResponse
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
@@ -39,6 +40,11 @@ class ForbiddenError(AppError):
 class BadRequestError(AppError):
     status_code = status.HTTP_400_BAD_REQUEST
     code = "bad_request"
+
+
+class ServiceUnavailableError(AppError):
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    code = "service_unavailable"
 
 
 def error_payload(
@@ -93,6 +99,41 @@ def register_exception_handlers(app: FastAPI) -> None:
             content=error_payload(
                 code="http_error",
                 message=str(exc.detail),
+                request_id=getattr(request.state, "request_id", None),
+            ),
+        )
+    @app.exception_handler(IntegrityError)
+    async def integrity_error_handler(request: Request, exc: IntegrityError) -> ORJSONResponse:
+        return ORJSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content=error_payload(
+                code="integrity_error",
+                message="Database constraint violation",
+                details={"reason": str(getattr(exc, "orig", exc))},
+                request_id=getattr(request.state, "request_id", None),
+            ),
+        )
+
+    @app.exception_handler(SQLAlchemyError)
+    async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError) -> ORJSONResponse:
+        return ORJSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=error_payload(
+                code="database_error",
+                message="Database operation failed",
+                details={"type": exc.__class__.__name__},
+                request_id=getattr(request.state, "request_id", None),
+            ),
+        )
+
+    @app.exception_handler(Exception)
+    async def unhandled_error_handler(request: Request, exc: Exception) -> ORJSONResponse:
+        return ORJSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content=error_payload(
+                code="internal_error",
+                message="Internal server error",
+                details={"type": exc.__class__.__name__},
                 request_id=getattr(request.state, "request_id", None),
             ),
         )
