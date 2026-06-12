@@ -39,33 +39,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {/* MOBILE HEADER BAR */}
-      <div className="lg:hidden flex items-center justify-between px-5 py-3 border-b border-[#EDEDED] bg-white sticky top-0 z-30">
+      <div className="lg:hidden flex items-center justify-between px-5 py-3 border-b border-border bg-surface sticky top-0 z-30">
         <div className="flex items-center gap-2">
           {/* Logo Icon */}
-          <div className="w-6 h-6 bg-[#1A1A1A] rounded-sm flex items-center justify-center">
-            <span className="text-white text-[10px] font-bold font-mono">C</span>
+          <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center text-background font-bold text-lg tracking-wider">
+            C
           </div>
-          <span className="font-semibold text-[#1A1A1A] text-sm tracking-tight">Mini CRM</span>
+          <div>
+            <span className="font-bold tracking-tight text-sm text-text-primary block">Mini CRM</span>
+            <p className="text-[9px] font-mono text-text-secondary tracking-widest uppercase">Ассистент</p>
+          </div>
         </div>
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="p-1 px-1.5 hover:bg-[#F5F5F4] rounded-md text-[#666666] hover:text-[#1A1A1A] transition-colors"
+          className="p-2 hover:bg-surface-secondary rounded-xl text-text-secondary hover:text-text-primary transition-colors border border-border/40"
         >
-          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
         </button>
       </div>
 
       {/* MOBILE SIDEBAR DROPDOWN DRAWER */}
       <AnimatePresence>
         {mobileOpen && (
-          <div className="lg:hidden fixed inset-0 z-25 flex">
+          <div className="lg:hidden fixed inset-0 z-40 flex">
             {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              animate={{ opacity: 0.5 }}
               exit={{ opacity: 0 }}
               onClick={() => setMobileOpen(false)}
-              className="fixed inset-0 bg-[#1A1A1A]/10 backdrop-blur-[1px]"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm"
             />
 
             {/* Menu Sliding Body */}
@@ -73,18 +76,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
-              transition={{ type: 'tween', duration: 0.15 }}
-              className="relative w-64 bg-white h-full border-r border-[#EDEDED] flex flex-col justify-between shadow-xl z-10 p-5"
+              transition={{ type: 'tween', duration: 0.2 }}
+              className="relative w-64 bg-surface h-full border-r border-border flex flex-col justify-between shadow-2xl z-50 p-5"
             >
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 bg-[#1A1A1A] rounded-sm flex items-center justify-center">
-                      <span className="text-white text-[10px] font-bold font-mono">C</span>
+                    <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center text-background font-bold text-lg tracking-wider">
+                      C
                     </div>
-                    <span className="font-semibold text-[#1A1A1A] text-sm tracking-tight">Mini CRM</span>
+                    <div>
+                      <span className="font-bold tracking-tight text-sm text-text-primary block">Mini CRM</span>
+                      <p className="text-[9px] font-mono text-text-secondary tracking-widest uppercase">Ассистент</p>
+                    </div>
                   </div>
-                  <button onClick={() => setMobileOpen(false)} className="p-1 text-[#666666] hover:text-[#1A1A1A] rounded-md">
+                  <button 
+                    onClick={() => setMobileOpen(false)} 
+                    className="p-2 rounded-xl bg-surface-secondary/60 text-text-secondary hover:text-text-primary border border-border/40 transition-all active:scale-95"
+                  >
                      <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -98,13 +107,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         key={item.id}
                         onClick={() => handleItemClick(item.id)}
                         className={cn(
-                          'w-full flex items-center gap-3 px-3 py-2 text-sm transition-all duration-150 rounded-md',
+                          'w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium tracking-tight transition-all duration-200 outline-none group',
                           isActive
-                            ? 'bg-[#F5F5F4] text-[#1A1A1A] font-medium border-l-2 border-[#1A1A1A] rounded-l-none'
-                            : 'text-[#666666] hover:bg-[#F5F5F4] hover:text-[#1A1A1A]'
+                            ? 'bg-accent text-background shadow-sm shadow-accent/10'
+                            : 'text-text-secondary hover:text-text-primary hover:bg-surface-secondary'
                         )}
                       >
-                        <Icon className={cn('w-4 h-4', isActive ? 'text-[#1A1A1A] opacity-80' : 'text-[#666666] opacity-50')} />
+                        <Icon className="w-4 h-4 shrink-0 transition-transform duration-200 group-hover:scale-105" />
                         <span>{item.label}</span>
                       </button>
                     );
@@ -113,14 +122,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
 
               {/* Mobile User Profile Section */}
-              <div className="border-t border-[#EDEDED] pt-4 space-y-3">
+              <div className="border-t border-border pt-4 space-y-3 bg-surface-secondary/20 p-2 rounded-2xl">
                 <div className="flex items-center gap-3 px-1">
-                  <div className="w-9 h-9 rounded-full bg-neutral-900 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-accent text-background flex items-center justify-center font-bold text-sm flex-shrink-0">
                     {userName ? userName.charAt(0).toUpperCase() : 'U'}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <span className="font-semibold text-xs text-[#1A1A1A] block truncate">{userName || 'Пользователь'}</span>
-                    <span className="text-[10px] text-neutral-400 block truncate">{userEmail || 'email@example.com'}</span>
+                    <span className="font-semibold text-xs text-text-primary block truncate">{userName || 'Пользователь'}</span>
+                    <span className="text-[10px] text-text-secondary block truncate">{userEmail || 'email@example.com'}</span>
                   </div>
                 </div>
                 {onLogout && (
@@ -129,7 +138,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       setMobileOpen(false);
                       onLogout();
                     }}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-red-50 hover:text-red-600 transition-all duration-150 rounded-lg border border-[#EDEDED] hover:border-red-100 font-medium"
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-danger hover:bg-danger/10 transition-all duration-200 rounded-xl font-medium border border-border/85"
                   >
                     <LogOut className="w-3.5 h-3.5" />
                     <span>Выйти из системы</span>
@@ -142,15 +151,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </AnimatePresence>
 
       {/* DESKTOP FIXED SIDEBAR */}
-      <aside className="hidden lg:flex flex-col justify-between w-60 border-r border-[#EDEDED] bg-white sticky top-0 h-screen p-5 flex-shrink-0 select-none">
+      <aside className="hidden lg:flex flex-col justify-between w-64 border-r border-border bg-surface sticky top-0 h-screen p-5 flex-shrink-0 select-none">
         <div className="space-y-7">
           {/* Company Title */}
           <div className="flex items-center gap-2 px-1">
-            <div className="w-6 h-6 bg-[#1A1A1A] rounded-sm flex items-center justify-center">
-              <span className="text-white text-[10px] font-bold font-mono">C</span>
+            <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center text-background font-bold text-lg tracking-wider">
+              C
             </div>
             <div>
-              <span className="font-semibold text-[#1A1A1A] text-sm tracking-tight block">Mini CRM</span>
+              <span className="font-bold tracking-tight text-sm text-text-primary block">Mini CRM</span>
+              <p className="text-[9px] font-mono text-text-secondary tracking-widest uppercase">Ассистент</p>
             </div>
           </div>
 
@@ -164,13 +174,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   key={item.id}
                   onClick={() => handleItemClick(item.id)}
                   className={cn(
-                    'w-full flex items-center gap-3 px-3 py-2 text-sm transition-all duration-150 rounded-md',
+                    'w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium tracking-tight transition-all duration-200 outline-none group',
                     isActive
-                      ? 'bg-[#F5F5F4] text-[#1A1A1A] font-medium border-l-2 border-[#1A1A1A] rounded-l-none'
-                      : 'text-[#666666] hover:bg-[#F5F5F4] hover:text-[#1A1A1A]'
+                      ? 'bg-accent text-background shadow-sm shadow-accent/10'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-secondary'
                   )}
                 >
-                  <Icon className={cn('w-4 h-4', isActive ? 'text-[#1A1A1A] opacity-80' : 'text-[#666666] opacity-50')} />
+                  <Icon className="w-4 h-4 shrink-0 transition-transform duration-200 group-hover:scale-105" />
                   <span>{item.label}</span>
                 </button>
               );
@@ -179,20 +189,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* User profile section at the bottom */}
-        <div className="border-t border-[#EDEDED] pt-4 mt-auto space-y-3">
+        <div className="border-t border-border pt-4 mt-auto space-y-3 bg-surface-secondary/20 p-3 rounded-2xl">
           <div className="flex items-center gap-3 px-1">
-            <div className="w-9 h-9 rounded-full bg-neutral-900 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
+            <div className="w-9 h-9 rounded-full bg-accent text-background flex items-center justify-center font-bold text-sm flex-shrink-0">
               {userName ? userName.charAt(0).toUpperCase() : 'U'}
             </div>
             <div className="min-w-0 flex-1">
-              <span className="font-semibold text-xs text-[#1A1A1A] block truncate">{userName || 'Пользователь'}</span>
-              <span className="text-[10px] text-neutral-400 block truncate">{userEmail || 'email@example.com'}</span>
+              <span className="font-semibold text-xs text-text-primary block truncate">{userName || 'Пользователь'}</span>
+              <span className="text-[10px] text-text-secondary block truncate">{userEmail || 'email@example.com'}</span>
             </div>
           </div>
           {onLogout && (
             <button
               onClick={onLogout}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-red-50 hover:text-red-600 transition-all duration-150 rounded-lg border border-[#EDEDED] hover:border-red-100 font-medium"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-danger hover:bg-danger/10 transition-all duration-200 rounded-xl font-medium border border-border/85"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Выйти из системы</span>

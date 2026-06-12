@@ -14,11 +14,11 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   actions,
 }) => {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-neutral-100 mb-6">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-border mb-6">
       <div className="space-y-1">
-        <h1 className="text-xl font-bold text-neutral-900 tracking-tight">{title}</h1>
+        <h1 className="text-xl font-bold text-text-primary tracking-tight">{title}</h1>
         {description && (
-          <p className="text-xs text-neutral-400 font-normal">{description}</p>
+          <p className="text-xs text-text-secondary font-medium">{description}</p>
         )}
       </div>
       {actions && (

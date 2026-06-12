@@ -34,15 +34,15 @@ interface CRMContextType {
   setContactModalOpen: (val: boolean) => void;
   selectedContact: Partial<Contact> | null;
   setSelectedContact: (val: Partial<Contact> | null) => void;
-  editContactMode: 'create' | 'edit';
-  setEditContactMode: (val: 'create' | 'edit') => void;
+  editContactMode: 'create' | 'edit' | 'view';
+  setEditContactMode: (val: 'create' | 'edit' | 'view') => void;
   
   dealModalOpen: boolean;
   setDealModalOpen: (val: boolean) => void;
   selectedDeal: Partial<Deal> | null;
   setSelectedDeal: (val: Partial<Deal> | null) => void;
-  editDealMode: 'create' | 'edit';
-  setEditDealMode: (val: 'create' | 'edit') => void;
+  editDealMode: 'create' | 'edit' | 'view';
+  setEditDealMode: (val: 'create' | 'edit' | 'view') => void;
   
   newPhoneInput: string;
   setNewPhoneInput: (val: string) => void;
@@ -169,11 +169,11 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Modal active states
   const [contactModalOpen, setContactModalOpen] = React.useState(false);
   const [selectedContact, setSelectedContact] = React.useState<Partial<Contact> | null>(null);
-  const [editContactMode, setEditContactMode] = React.useState<'create' | 'edit'>('create');
+  const [editContactMode, setEditContactMode] = React.useState<'create' | 'edit' | 'view'>('create');
 
   const [dealModalOpen, setDealModalOpen] = React.useState(false);
   const [selectedDeal, setSelectedDeal] = React.useState<Partial<Deal> | null>(null);
-  const [editDealMode, setEditDealMode] = React.useState<'create' | 'edit'>('create');
+  const [editDealMode, setEditDealMode] = React.useState<'create' | 'edit' | 'view'>('create');
 
   // Input states inside modals
   const [newPhoneInput, setNewPhoneInput] = React.useState('');
@@ -182,7 +182,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [newTagInput, setNewTagInput] = React.useState('');
 
   // Push notification banner state
-  const [pushBanner, setPushBanner] = React.useState<{ id: string; title: string; message: string } | null>(null);
+  const [pushBanners, setPushBanners] = React.useState<{ id: string; type: string; action: string; title: string; details: string; agentName?: string; time: string }[]>([]);
 
   // Search & Filter state for CONTACTS
   const [contactsSearch, setContactsSearch] = React.useState('');
@@ -217,36 +217,109 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     else router.push(`/${section}`);
   };
 
-  const triggerPush = React.useCallback((title: string, message: string) => {
+  const triggerPush = React.useCallback((title: string, message: string, payload?: any, eventType?: string, latestDb?: any) => {
     const id = Math.random().toString(36).substring(2, 9);
-    setPushBanner({ id, title, message });
+    
+    // Extract Agent Name if present
+    let agentName = '';
+    let messageText = message || '';
+    const agentMatch = messageText.match(/^\[(.*?)\]\s*(.*)/);
+    if (agentMatch) {
+      agentName = agentMatch[1];
+      messageText = agentMatch[2];
+    }
+    
+    const isAi = title && title.includes('🤖');
+    let parsedTitle = title || 'Обновление CRM';
+    let parsedDetails = messageText;
+    let type = 'other';
+    let action = 'other';
+
+    const targetDb = latestDb || db;
+
+    // Parse event details using payload and current db state
+    if (eventType) {
+      if (eventType.startsWith('crm.contact.')) {
+        type = 'contact';
+        const contactId = payload?.contact_id;
+        const contact = targetDb?.contacts?.find((c: any) => String(c.id) === String(contactId));
+        
+        if (eventType === 'crm.contact.created') {
+          action = 'created';
+          parsedTitle = contact ? `Новый контакт: ${contact.name}` : 'Создан контакт';
+          if (contact) {
+            const phone = contact.phones?.[0];
+            const email = contact.emails?.[0];
+            parsedDetails = [phone, email].filter(Boolean).join(' | ') || 'Контакты не указаны';
+          }
+        } else if (eventType === 'crm.contact.updated') {
+          action = 'updated';
+          parsedTitle = contact ? `Контакт изменен: ${contact.name}` : 'Обновлен контакт';
+          if (contact) {
+            const tags = contact.tags?.length ? `Теги: ${contact.tags.join(', ')}` : '';
+            parsedDetails = tags || 'Контакт обновлен в системе';
+          }
+        } else if (eventType === 'crm.contact.deleted') {
+          action = 'deleted';
+          parsedTitle = `Удален контакт #${contactId}`;
+          parsedDetails = 'Данные контакта стерты из CRM';
+        }
+      } else if (eventType.startsWith('crm.deal.')) {
+        type = 'deal';
+        const dealId = payload?.deal_id;
+        const deal = targetDb?.deals?.find((d: any) => String(d.id) === String(dealId));
+        
+        if (eventType === 'crm.deal.created') {
+          action = 'created';
+          parsedTitle = deal ? `Новая сделка: ${deal.title}` : 'Создана сделка';
+          if (deal) {
+            const amountStr = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(deal.amount);
+            const contact = targetDb?.contacts?.find((c: any) => String(c.id) === String(deal.contactId));
+            parsedDetails = `${amountStr} • ${contact ? contact.name : 'Без контакта'}`;
+          }
+        } else if (eventType === 'crm.deal.updated') {
+          action = 'updated';
+          parsedTitle = deal ? `Сделка изменена: ${deal.title}` : 'Обновлена сделка';
+          if (deal) {
+            const amountStr = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(deal.amount);
+            parsedDetails = `Статус: ${deal.status} • ${amountStr}`;
+          }
+        } else if (eventType === 'crm.deal.deleted') {
+          action = 'deleted';
+          parsedTitle = `Удалена сделка #${dealId}`;
+          parsedDetails = 'Сделка исключена из воронки';
+        }
+      }
+    }
+
+    const newBanner = {
+      id,
+      type,
+      action,
+      title: parsedTitle,
+      details: parsedDetails,
+      agentName: isAi ? (agentName || 'AI-Ассистент') : undefined,
+      time: 'сейчас'
+    };
+
+    setPushBanners((current) => [...current, newBanner]);
 
     // Auto dismiss after 6 seconds
     setTimeout(() => {
-      setPushBanner(current => current?.id === id ? null : current);
+      setPushBanners((current) => current.filter((b) => b.id !== id));
     }, 6000);
 
     // native browser notification fallback (if permitted)
     if (typeof window !== 'undefined' && 'Notification' in window) {
       if (Notification.permission === 'granted') {
         try {
-          new Notification(title, { body: message });
+          new Notification(parsedTitle, { body: parsedDetails });
         } catch (e) {
           console.log('Frame native push error:', e);
         }
-      } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then(perm => {
-          if (perm === 'granted') {
-            try {
-              new Notification(title, { body: message });
-            } catch (e) {
-              console.log('Frame native push error:', e);
-            }
-          }
-        });
       }
     }
-  }, []);
+  }, [db]);
 
   // Triggering API fetch to server via CrmApiClient
   const fetchDB = React.useCallback(async (silent = false) => {
@@ -348,8 +421,14 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const message = JSON.parse(event.data);
           if (message.type !== 'notification' || !message.data) return;
 
-          triggerPush(message.data.title || 'CRM обновлена', message.data.message || 'Данные обновлены');
-          await fetchDB(true);
+          const updatedDb = await fetchDB(true);
+          triggerPush(
+            message.data.title || 'CRM обновлена',
+            message.data.message || 'Данные обновлены',
+            message.data.payload,
+            message.data.type,
+            updatedDb
+          );
         } catch (err) {
           console.error('Realtime message handling failed:', err);
         }
@@ -494,7 +573,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const openEditContact = (contact: Contact) => {
-    setEditContactMode('edit');
+    setEditContactMode('view');
     setSelectedContact(JSON.parse(JSON.stringify(contact))); // Deep copy
     setNewPhoneInput('');
     setNewEmailInput('');
@@ -534,7 +613,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const openEditDeal = (deal: Deal) => {
-    setEditDealMode('edit');
+    setEditDealMode('view');
     setSelectedDeal({ ...deal });
     setDealModalOpen(true);
   };
@@ -939,353 +1018,473 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         <ResponsiveModal
           isOpen={contactModalOpen}
           onClose={() => setContactModalOpen(false)}
-          title={editContactMode === 'create' ? 'Новый контакт' : 'Карточка контакта'}
+          title={editContactMode === 'create' ? 'Новый контакт' : editContactMode === 'view' ? 'Просмотр контакта' : 'Редактировать контакт'}
           className="max-w-2xl"
         >
           {selectedContact && (
-            <div className="space-y-5 font-normal text-sm select-none">
-              {/* Name segments */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Фамилия <span className="text-red-500">*</span></label>
-                  <Input
-                    value={selectedContact.lastName || ''}
-                    onChange={(e) => setSelectedContact({ ...selectedContact, lastName: e.target.value })}
-                    placeholder="Иванов"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Имя <span className="text-red-500">*</span></label>
-                  <Input
-                    value={selectedContact.firstName || ''}
-                    onChange={(e) => setSelectedContact({ ...selectedContact, firstName: e.target.value })}
-                    placeholder="Иван"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Отчество</label>
-                  <Input
-                    value={selectedContact.middleName || ''}
-                    onChange={(e) => setSelectedContact({ ...selectedContact, middleName: e.target.value })}
-                    placeholder="Иванович"
-                  />
-                </div>
-              </div>
+            <div className="font-normal text-sm select-none">
+              {editContactMode === 'view' ? (
+                /* VIEW / READ-ONLY MODE */
+                <div className="space-y-6">
+                  {/* Header Info */}
+                  <div className="flex items-center justify-between border-b border-border pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-accent/10 text-accent rounded-2xl flex items-center justify-center font-bold text-lg">
+                        {selectedContact.firstName ? selectedContact.firstName.charAt(0).toUpperCase() : 'C'}
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-text-primary">
+                          {[selectedContact.lastName, selectedContact.firstName, selectedContact.middleName].filter(Boolean).join(' ')}
+                        </h3>
+                        <p className="text-[10px] text-text-secondary font-bold uppercase tracking-wider mt-0.5">Клиент CRM</p>
+                      </div>
+                    </div>
+                    <Button variant="secondary" size="sm" onClick={() => setEditContactMode('edit')} className="flex items-center gap-1.5 rounded-xl">
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Редактировать</span>
+                    </Button>
+                  </div>
 
-              {/* PHONES MULTIPLE ARRAY VALUE - CUSTOM LIST */}
-              <div className="space-y-2">
-                <label className="text-xs text-neutral-500 font-semibold uppercase tracking-wider">Номера телефонов</label>
-                <div className="space-y-2">
-                  {selectedContact.phones && selectedContact.phones.length > 0 && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {selectedContact.phones.map((phone, idx) => (
-                        <div key={idx} className="flex items-center justify-between bg-[#F9F9F8] border border-[#EDEDED] rounded-lg px-3 py-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Phone className="w-3.5 h-3.5 text-[#666666]/60 flex-shrink-0" />
-                            <span className="text-xs text-[#1A1A1A] font-medium font-mono truncate">{phone}</span>
+                  {/* Details grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Contact info */}
+                    <div className="space-y-4">
+                      {/* Phones */}
+                      <div>
+                        <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block mb-2">Номера телефонов</span>
+                        {selectedContact.phones && selectedContact.phones.length > 0 ? (
+                          <div className="flex flex-col gap-1.5">
+                            {selectedContact.phones.map((phone, idx) => (
+                              <div key={idx} className="flex items-center gap-2 text-xs font-semibold text-text-primary bg-surface-secondary/40 border border-border/60 px-3 py-2 rounded-xl">
+                                <Phone className="w-3.5 h-3.5 text-text-secondary" />
+                                <span>{phone}</span>
+                              </div>
+                            ))}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = (selectedContact.phones || []).filter((_, i) => i !== idx);
+                        ) : (
+                          <span className="text-xs text-text-secondary/50 italic font-medium">Телефоны не указаны</span>
+                        )}
+                      </div>
+
+                      {/* Emails */}
+                      <div>
+                        <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block mb-2">Адреса Email</span>
+                        {selectedContact.emails && selectedContact.emails.length > 0 ? (
+                          <div className="flex flex-col gap-1.5">
+                            {selectedContact.emails.map((email, idx) => (
+                              <div key={idx} className="flex items-center gap-2 text-xs font-mono font-semibold text-text-primary bg-surface-secondary/40 border border-border/60 px-3 py-2 rounded-xl">
+                                <Mail className="w-3.5 h-3.5 text-text-secondary" />
+                                <span>{email}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-text-secondary/50 italic font-medium">Email не указаны</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Addresses and Tags */}
+                    <div className="space-y-4">
+                      {/* Addresses */}
+                      <div>
+                        <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block mb-2">Физические адреса</span>
+                        {selectedContact.addresses && selectedContact.addresses.length > 0 ? (
+                          <div className="flex flex-col gap-1.5">
+                            {selectedContact.addresses.map((addr, idx) => (
+                              <div key={idx} className="flex items-center gap-2 text-xs font-medium text-text-primary bg-surface-secondary/40 border border-border/60 px-3 py-2 rounded-xl">
+                                <MapPin className="w-3.5 h-3.5 text-text-secondary flex-shrink-0" />
+                                <span className="truncate">{addr}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-text-secondary/50 italic font-medium">Адреса не указаны</span>
+                        )}
+                      </div>
+
+                      {/* Tags */}
+                      <div>
+                        <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block mb-2">Теги контакта</span>
+                        {selectedContact.tags && selectedContact.tags.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5 p-2 bg-surface-secondary/20 border border-border/80 rounded-2xl">
+                            {selectedContact.tags.map((tag) => (
+                              <Badge key={tag} variant="gray">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-text-secondary/50 italic font-medium">Теги отсутствуют</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block mb-2">Заметки и описание</span>
+                    {selectedContact.notes ? (
+                      <div className="p-4 bg-surface-secondary/30 border border-border rounded-2xl text-xs text-text-primary leading-relaxed font-medium">
+                        {selectedContact.notes}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-text-secondary/50 italic font-medium">Нет дополнительных заметок</span>
+                    )}
+                  </div>
+
+                  {/* Associated Deals */}
+                  <div className="pt-4 border-t border-border">
+                    <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block mb-3">Связанные сделки</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {safeDb.deals.filter((d) => d.contactId === selectedContact.id).length > 0 ? (
+                        safeDb.deals
+                          .filter((d) => d.contactId === selectedContact.id)
+                          .map((deal) => (
+                            <div
+                              key={deal.id}
+                              onClick={() => handleContactDealClick(deal.id)}
+                              className="flex items-center justify-between p-3 rounded-2xl bg-surface border border-border hover:bg-surface-secondary/40 cursor-pointer transition-all duration-150 group"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <span className="text-xs font-bold text-text-primary truncate block group-hover:text-accent">
+                                  {deal.title}
+                                </span>
+                                <span className="text-[10px] text-text-secondary font-semibold block mt-0.5">
+                                  {formatMoney(deal.amount)} • {deal.status}
+                                </span>
+                              </div>
+                              <ArrowRight className="w-4 h-4 text-text-secondary group-hover:text-text-primary transition-transform group-hover:translate-x-0.5" />
+                            </div>
+                          ))
+                      ) : (
+                        <span className="text-xs text-text-secondary/50 italic font-medium">Связанных сделок нет</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Footer buttons */}
+                  <div className="flex justify-end pt-4 border-t border-border">
+                    <Button variant="secondary" onClick={() => setContactModalOpen(false)}>
+                      Закрыть
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                /* EDIT / CREATE MODE */
+                <div className="space-y-5">
+                  {/* Name segments */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Фамилия <span className="text-red-500">*</span></label>
+                      <Input
+                        value={selectedContact.lastName || ''}
+                        onChange={(e) => setSelectedContact({ ...selectedContact, lastName: e.target.value })}
+                        placeholder="Иванов"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Имя <span className="text-red-500">*</span></label>
+                      <Input
+                        value={selectedContact.firstName || ''}
+                        onChange={(e) => setSelectedContact({ ...selectedContact, firstName: e.target.value })}
+                        placeholder="Иван"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Отчество</label>
+                      <Input
+                        value={selectedContact.middleName || ''}
+                        onChange={(e) => setSelectedContact({ ...selectedContact, middleName: e.target.value })}
+                        placeholder="Иванович"
+                      />
+                    </div>
+                  </div>
+
+                  {/* PHONES MULTIPLE ARRAY VALUE - CUSTOM LIST */}
+                  <div className="space-y-2">
+                    <label className="text-xs text-neutral-500 font-semibold uppercase tracking-wider">Номера телефонов</label>
+                    <div className="space-y-2">
+                      {selectedContact.phones && selectedContact.phones.length > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {selectedContact.phones.map((phone, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-surface-secondary/40 border border-border/80 rounded-xl px-3 py-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Phone className="w-3.5 h-3.5 text-text-secondary flex-shrink-0" />
+                                <span className="text-xs text-text-primary font-bold font-mono truncate">{phone}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = (selectedContact.phones || []).filter((_, i) => i !== idx);
+                                  setSelectedContact({ ...selectedContact, phones: updated });
+                                }}
+                                className="p-1 text-text-secondary hover:text-danger rounded-xl transition-colors"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* Add dynamic cell */}
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary/40" />
+                          <Input
+                            placeholder="+7 (999) 000-00-00"
+                            value={newPhoneInput}
+                            onChange={(e) => setNewPhoneInput(e.target.value)}
+                            className="pl-9"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && newPhoneInput.trim()) {
+                                e.preventDefault();
+                                const updated = [...(selectedContact.phones || []), newPhoneInput.trim()];
+                                setSelectedContact({ ...selectedContact, phones: updated });
+                                setNewPhoneInput('');
+                              }
+                            }}
+                          />
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            if (newPhoneInput.trim()) {
+                              const updated = [...(selectedContact.phones || []), newPhoneInput.trim()];
                               setSelectedContact({ ...selectedContact, phones: updated });
-                            }}
-                            className="p-1 text-[#666666] hover:text-red-500 rounded transition-colors"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
+                              setNewPhoneInput('');
+                            } else {
+                              showToast('Введите телефон для добавления.', 'error');
+                            }
+                          }}
+                        >
+                          Добавить
+                        </Button>
+                      </div>
                     </div>
-                  )}
-                  {/* Add dynamic cell */}
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Phone className="absolute left-3 top-2.5 w-4 h-4 text-[#666666]/40" />
-                      <Input
-                        placeholder="+7 (999) 000-00-00"
-                        value={newPhoneInput}
-                        onChange={(e) => setNewPhoneInput(e.target.value)}
-                        className="pl-9"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && newPhoneInput.trim()) {
-                            e.preventDefault();
-                            const updated = [...(selectedContact.phones || []), newPhoneInput.trim()];
-                            setSelectedContact({ ...selectedContact, phones: updated });
-                            setNewPhoneInput('');
-                          }
-                        }}
-                      />
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        if (newPhoneInput.trim()) {
-                          const updated = [...(selectedContact.phones || []), newPhoneInput.trim()];
-                          setSelectedContact({ ...selectedContact, phones: updated });
-                          setNewPhoneInput('');
-                        } else {
-                          showToast('Введите телефон для добавления.', 'error');
-                        }
-                      }}
-                    >
-                      Добавить
-                    </Button>
                   </div>
-                </div>
-              </div>
 
-              {/* EMAILS MULTIPLE ARRAY VALUE - CUSTOM LIST */}
-              <div className="space-y-2">
-                <label className="text-xs text-neutral-500 font-semibold uppercase tracking-wider">Адреса Email</label>
-                <div className="space-y-2">
-                  {selectedContact.emails && selectedContact.emails.length > 0 && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {selectedContact.emails.map((email, idx) => (
-                        <div key={idx} className="flex items-center justify-between bg-[#F9F9F8] border border-[#EDEDED] rounded-lg px-3 py-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Mail className="w-3.5 h-3.5 text-[#666666]/60 flex-shrink-0" />
-                            <span className="text-xs text-[#1A1A1A] font-mono truncate">{email}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = (selectedContact.emails || []).filter((_, i) => i !== idx);
+                  {/* EMAILS MULTIPLE ARRAY VALUE - CUSTOM LIST */}
+                  <div className="space-y-2">
+                    <label className="text-xs text-neutral-500 font-semibold uppercase tracking-wider">Адреса Email</label>
+                    <div className="space-y-2">
+                      {selectedContact.emails && selectedContact.emails.length > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {selectedContact.emails.map((email, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-surface-secondary/40 border border-border/80 rounded-xl px-3 py-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Mail className="w-3.5 h-3.5 text-text-secondary flex-shrink-0" />
+                                <span className="text-xs text-text-primary font-mono truncate">{email}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = (selectedContact.emails || []).filter((_, i) => i !== idx);
+                                  setSelectedContact({ ...selectedContact, emails: updated });
+                                }}
+                                className="p-1 text-text-secondary hover:text-danger rounded-xl transition-colors"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary/40" />
+                          <Input
+                            placeholder="example@mail.ru"
+                            type="email"
+                            value={newEmailInput}
+                            onChange={(e) => setNewEmailInput(e.target.value)}
+                            className="pl-9"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && newEmailInput.trim()) {
+                                e.preventDefault();
+                                const updated = [...(selectedContact.emails || []), newEmailInput.trim()];
+                                setSelectedContact({ ...selectedContact, emails: updated });
+                                setNewEmailInput('');
+                              }
+                            }}
+                          />
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            if (newEmailInput.trim()) {
+                              const updated = [...(selectedContact.emails || []), newEmailInput.trim()];
                               setSelectedContact({ ...selectedContact, emails: updated });
-                            }}
-                            className="p-1 text-[#666666] hover:text-red-500 rounded transition-colors"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
+                              setNewEmailInput('');
+                            } else {
+                              showToast('Введите email для добавления.', 'error');
+                            }
+                          }}
+                        >
+                          Добавить
+                        </Button>
+                      </div>
                     </div>
-                  )}
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Mail className="absolute left-3 top-2.5 w-4 h-4 text-[#666666]/40" />
-                      <Input
-                        placeholder="example@mail.ru"
-                        type="email"
-                        value={newEmailInput}
-                        onChange={(e) => setNewEmailInput(e.target.value)}
-                        className="pl-9"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && newEmailInput.trim()) {
-                            e.preventDefault();
-                            const updated = [...(selectedContact.emails || []), newEmailInput.trim()];
-                            setSelectedContact({ ...selectedContact, emails: updated });
-                            setNewEmailInput('');
-                          }
-                        }}
-                      />
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        if (newEmailInput.trim()) {
-                          const updated = [...(selectedContact.emails || []), newEmailInput.trim()];
-                          setSelectedContact({ ...selectedContact, emails: updated });
-                          setNewEmailInput('');
-                        } else {
-                          showToast('Введите email для добавления.', 'error');
-                        }
-                      }}
-                    >
-                      Добавить
-                    </Button>
                   </div>
-                </div>
-              </div>
 
-              {/* ADDRESSES MULTIPLE ARRAY VALUE - CUSTOM LIST */}
-              <div className="space-y-2">
-                <label className="text-xs text-neutral-500 font-semibold uppercase tracking-wider">Физические адреса (Доставка, Фирма)</label>
-                <div className="space-y-2">
-                  {selectedContact.addresses && selectedContact.addresses.length > 0 && (
-                    <div className="space-y-1.5">
-                      {selectedContact.addresses.map((addr, idx) => (
-                        <div key={idx} className="flex items-center justify-between bg-[#F9F9F8] border border-[#EDEDED] rounded-lg px-3 py-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <MapPin className="w-3.5 h-3.5 text-[#666666]/60 flex-shrink-0" />
-                            <span className="text-xs text-[#1A1A1A] truncate">{addr}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = (selectedContact.addresses || []).filter((_, i) => i !== idx);
+                  {/* ADDRESSES MULTIPLE ARRAY VALUE - CUSTOM LIST */}
+                  <div className="space-y-2">
+                    <label className="text-xs text-neutral-500 font-semibold uppercase tracking-wider">Физические адреса (Доставка, Фирма)</label>
+                    <div className="space-y-2">
+                      {selectedContact.addresses && selectedContact.addresses.length > 0 && (
+                        <div className="space-y-1.5">
+                          {selectedContact.addresses.map((addr, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-surface-secondary/40 border border-border/80 rounded-xl px-3 py-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <MapPin className="w-3.5 h-3.5 text-text-secondary flex-shrink-0" />
+                                <span className="text-xs text-text-primary truncate">{addr}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = (selectedContact.addresses || []).filter((_, i) => i !== idx);
+                                  setSelectedContact({ ...selectedContact, addresses: updated });
+                                }}
+                                className="p-1 text-text-secondary hover:text-danger rounded-xl transition-colors"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary/40" />
+                          <Input
+                            placeholder="Город, улица, офис..."
+                            value={newAddressInput}
+                            onChange={(e) => setNewAddressInput(e.target.value)}
+                            className="pl-9"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && newAddressInput.trim()) {
+                                e.preventDefault();
+                                const updated = [...(selectedContact.addresses || []), newAddressInput.trim()];
+                                setSelectedContact({ ...selectedContact, addresses: updated });
+                                setNewAddressInput('');
+                              }
+                            }}
+                          />
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            if (newAddressInput.trim()) {
+                              const updated = [...(selectedContact.addresses || []), newAddressInput.trim()];
                               setSelectedContact({ ...selectedContact, addresses: updated });
-                            }}
-                            className="p-1 text-[#666666] hover:text-red-500 rounded transition-colors"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
+                              setNewAddressInput('');
+                            } else {
+                              showToast('Введите адрес для добавления.', 'error');
+                            }
+                          }}
+                        >
+                          Добавить
+                        </Button>
+                      </div>
                     </div>
-                  )}
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <MapPin className="absolute left-3 top-2.5 w-4 h-4 text-[#666666]/40" />
+                  </div>
+
+                  {/* TAG CHIP EDITOR */}
+                  <div className="space-y-2">
+                    <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Теги контакта</label>
+                    <div className="flex flex-wrap gap-1.5 p-2 bg-surface-secondary/20 border border-border/80 rounded-2xl">
+                      {(selectedContact.tags || []).length > 0 ? (
+                        selectedContact.tags?.map((tag) => (
+                          <Badge
+                            key={tag}
+                            variant="gray"
+                            onRemove={() => {
+                              const updated = (selectedContact.tags || []).filter((t) => t !== tag);
+                              setSelectedContact({ ...selectedContact, tags: updated });
+                            }}
+                          >
+                            {tag}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-xs text-text-secondary">Нет добавленных тегов</span>
+                      )}
+                    </div>
+                    <div className="flex gap-2 select-all">
                       <Input
-                        placeholder="Город, улица, офис..."
-                        value={newAddressInput}
-                        onChange={(e) => setNewAddressInput(e.target.value)}
-                        className="pl-9"
+                        placeholder="Новый тег"
+                        value={newTagInput}
+                        onChange={(e) => setNewTagInput(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter' && newAddressInput.trim()) {
+                          if (e.key === 'Enter' && newTagInput.trim()) {
                             e.preventDefault();
-                            const updated = [...(selectedContact.addresses || []), newAddressInput.trim()];
-                            setSelectedContact({ ...selectedContact, addresses: updated });
-                            setNewAddressInput('');
+                            const val = newTagInput.trim();
+                            if (selectedContact.tags?.includes(val)) {
+                              showToast('Этот тег уже существует.', 'error');
+                              return;
+                            }
+                            const updated = [...(selectedContact.tags || []), val];
+                            setSelectedContact({ ...selectedContact, tags: updated });
+                            setNewTagInput('');
                           }
                         }}
                       />
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        if (newAddressInput.trim()) {
-                          const updated = [...(selectedContact.addresses || []), newAddressInput.trim()];
-                          setSelectedContact({ ...selectedContact, addresses: updated });
-                          setNewAddressInput('');
-                        } else {
-                          showToast('Введите адрес для добавления.', 'error');
-                        }
-                      }}
-                    >
-                      Добавить
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* TAG CHIP EDITOR */}
-              <div className="space-y-2">
-                <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Теги контакта</label>
-                <div className="flex flex-wrap gap-1.5 p-2 bg-neutral-50/50 border border-neutral-200/80 rounded-lg">
-                  {(selectedContact.tags || []).length > 0 ? (
-                    selectedContact.tags?.map((tag) => (
-                      <Badge
-                        key={tag}
-                        variant="gray"
-                        onRemove={() => {
-                          const updated = (selectedContact.tags || []).filter((t) => t !== tag);
-                          setSelectedContact({ ...selectedContact, tags: updated });
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          const val = newTagInput.trim();
+                          if (val) {
+                            if (selectedContact.tags?.includes(val)) {
+                              showToast('Этот тег уже существует.', 'error');
+                              return;
+                            }
+                            const updated = [...(selectedContact.tags || []), val];
+                            setSelectedContact({ ...selectedContact, tags: updated });
+                            setNewTagInput('');
+                          } else {
+                            showToast('Введите тег.', 'error');
+                          }
                         }}
                       >
-                        {tag}
-                      </Badge>
-                    ))
-                  ) : (
-                    <span className="text-xs text-neutral-400">Нет добавленных тегов</span>
-                  )}
-                </div>
-                <div className="flex gap-2 select-all">
-                  <Input
-                    placeholder="Новый тег"
-                    value={newTagInput}
-                    onChange={(e) => setNewTagInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && newTagInput.trim()) {
-                        e.preventDefault();
-                        const val = newTagInput.trim();
-                        if (selectedContact.tags?.includes(val)) {
-                          showToast('Этот тег уже существует.', 'error');
-                          return;
-                        }
-                        const updated = [...(selectedContact.tags || []), val];
-                        setSelectedContact({ ...selectedContact, tags: updated });
-                        setNewTagInput('');
-                      }
-                    }}
-                  />
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      const val = newTagInput.trim();
-                      if (val) {
-                        if (selectedContact.tags?.includes(val)) {
-                          showToast('Этот тег уже существует.', 'error');
-                          return;
-                        }
-                        const updated = [...(selectedContact.tags || []), val];
-                        setSelectedContact({ ...selectedContact, tags: updated });
-                        setNewTagInput('');
-                      } else {
-                        showToast('Введите тег.', 'error');
-                      }
-                    }}
-                  >
-                    Добавить
-                  </Button>
-                </div>
-              </div>
+                        Добавить
+                      </Button>
+                    </div>
+                  </div>
 
-              {/* NOTES */}
-              <div className="space-y-1">
-                <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Заметки и описание</label>
-                <Textarea
-                  placeholder="Дополнительные примечания к клиенту..."
-                  value={selectedContact.notes || ''}
-                  onChange={(e) => setSelectedContact({ ...selectedContact, notes: e.target.value })}
-                />
-              </div>
+                  {/* NOTES */}
+                  <div className="space-y-1">
+                    <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider">Заметки и описание</label>
+                    <Textarea
+                      placeholder="Дополнительные примечания к клиенту..."
+                      value={selectedContact.notes || ''}
+                      onChange={(e) => setSelectedContact({ ...selectedContact, notes: e.target.value })}
+                    />
+                  </div>
 
-              {/* ASSOCIATED DEALS CHIPS */}
-              {editContactMode === 'edit' && (
-                <div className="space-y-2 select-all pt-2 border-t border-neutral-100">
-                  <label className="text-xs text-neutral-400 font-semibold uppercase tracking-wider block">Связанные сделки</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {safeDb.deals.filter((d) => d.contactId === selectedContact.id).length > 0 ? (
-                      safeDb.deals
-                        .filter((d) => d.contactId === selectedContact.id)
-                        .map((deal) => (
-                          <div
-                            key={deal.id}
-                            onClick={() => handleContactDealClick(deal.id)}
-                            className="flex items-center justify-between p-2 rounded-lg bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/60 cursor-pointer transition-all duration-100 group"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <span className="text-xs font-semibold text-neutral-800 truncate block group-hover:text-black">
-                                {deal.title}
-                              </span>
-                              <span className="text-[10px] text-neutral-500 font-medium">
-                                {formatMoney(deal.amount)} • {deal.status}
-                              </span>
-                            </div>
-                            <ArrowRight className="w-3.5 h-3.5 text-neutral-400 group-hover:text-neutral-700 transition-transform group-hover:translate-x-0.5" />
-                          </div>
-                        ))
-                    ) : (
-                      <span className="text-xs text-neutral-400 italic">Связанных сделок нет.</span>
-                    )}
+                  {/* BUTTONS SAVE CANCEL */}
+                  <div className="flex items-center justify-between gap-3 pt-5 border-t border-border">
+                    <div>
+                      {editContactMode === 'edit' && (
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => initiateDeleteContact(selectedContact.id!)}
+                        >
+                          Удалить контакт
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" onClick={() => setContactModalOpen(false)}>
+                        Отмена
+                      </Button>
+                      <Button variant="primary" onClick={saveContactForm}>
+                        Сохранить
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
-
-              {/* BUTTONS SAVE CANCEL */}
-              <div className="flex items-center justify-between gap-3 pt-5 border-t border-neutral-100">
-                <div>
-                  {editContactMode === 'edit' && (
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => initiateDeleteContact(selectedContact.id!)}
-                    >
-                      Удалить контакт
-                    </Button>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" onClick={() => setContactModalOpen(false)}>
-                    Отмена
-                  </Button>
-                  <Button variant="primary" onClick={saveContactForm}>
-                    Сохранить
-                  </Button>
-                </div>
-              </div>
             </div>
           )}
         </ResponsiveModal>
@@ -1453,35 +1652,46 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         {/* 5. OVERLAY PUSH NOTIFICATIONS BANNER */}
         <div className="fixed top-5 right-5 z-50 flex flex-col gap-2.5 max-w-xs pointer-events-none">
           <AnimatePresence>
-            {pushBanner && (
+            {pushBanners.map((banner) => (
               <motion.div
-                key={pushBanner.id}
-                initial={{ opacity: 0, x: 50, scale: 0.95 }}
+                key={banner.id}
+                initial={{ opacity: 0, x: 80, scale: 0.9 }}
                 animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9, x: 30 }}
-                transition={{ type: 'spring', stiffness: 350, damping: 25 }}
-                className="bg-[#1A1A1A] border border-neutral-800 text-white p-4 rounded-xl shadow-xl flex items-start gap-3 pointer-events-auto select-none"
+                exit={{ opacity: 0, scale: 0.9, x: 50, transition: { duration: 0.2 } }}
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                className="bg-surface border border-border/80 text-text-primary p-3.5 rounded-2xl shadow-xl flex items-start gap-3 pointer-events-auto select-none w-80 relative overflow-hidden"
               >
-                <div className="w-7 h-7 rounded-lg bg-neutral-800 flex items-center justify-center flex-shrink-0">
-                  <Sparkles className="w-3.5 h-3.5 text-white" />
+                {/* Left Side Icon Indicator based on type & action */}
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  banner.action === 'created' ? 'bg-success/15 text-success' :
+                  banner.action === 'updated' ? 'bg-accent-soft text-text-primary' :
+                  banner.action === 'deleted' ? 'bg-danger/15 text-danger' : 'bg-surface-secondary text-text-secondary'
+                }`}>
+                  {banner.type === 'contact' ? <User className="w-4.5 h-4.5" /> :
+                   banner.type === 'deal' ? <TrendingUp className="w-4.5 h-4.5" /> :
+                   <Sparkles className="w-4.5 h-4.5" />}
                 </div>
-                <div className="flex-1 min-w-0 pr-1">
+                <div className="flex-1 min-w-0 pr-4">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold text-neutral-100 truncate">{pushBanner.title}</span>
-                    <button
-                      onClick={() => setPushBanner(null)}
-                      className="p-0.5 text-neutral-500 hover:text-white rounded-md transition-colors cursor-pointer"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
+                    <span className="text-xs font-bold text-text-primary truncate">{banner.title}</span>
                   </div>
-                  <p className="text-[10px] text-neutral-300 leading-normal mt-1">{pushBanner.message}</p>
-                  <div className="text-[8px] text-neutral-500 font-mono mt-2 text-right">
-                    сейчас
+                  <p className="text-[10px] text-text-secondary leading-normal mt-0.5 font-semibold">{banner.details}</p>
+                  
+                  <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-border/40 text-[9px] text-text-secondary/70 font-bold uppercase tracking-wider">
+                    <span>{banner.agentName ? `🤖 ${banner.agentName}` : 'CRM Система'}</span>
+                    <span className="font-mono lowercase tracking-normal font-medium">{banner.time}</span>
                   </div>
                 </div>
+                
+                {/* Close Button absolute top-2 right-2 */}
+                <button
+                  onClick={() => setPushBanners((current) => current.filter((b) => b.id !== banner.id))}
+                  className="absolute top-2 right-2 p-1 text-text-secondary/50 hover:text-text-primary rounded-xl hover:bg-surface-secondary transition-all cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </motion.div>
-            )}
+            ))}
           </AnimatePresence>
         </div>
       </div>

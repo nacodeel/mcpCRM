@@ -1,7 +1,18 @@
 import type { Metadata } from 'next';
+import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css'; // Global styles
 import { ToastProvider } from '@/components/ui';
 import { CRMProvider } from '@/context/crm-context';
+
+const inter = Inter({
+  subsets: ['latin', 'cyrillic'],
+  variable: '--font-sans',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-mono',
+});
 
 export const metadata: Metadata = {
   title: 'Mini CRM',
@@ -10,8 +21,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ru">
-      <body className="bg-[#F9F9F8] font-sans text-[#1A1A1A] antialiased min-h-screen" suppressHydrationWarning>
+    <html lang="ru" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+      <body suppressHydrationWarning className="font-sans antialiased text-text-primary bg-background min-h-screen">
         <ToastProvider>
           <CRMProvider>
             {children}
@@ -21,4 +32,3 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
-

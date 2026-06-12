@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Check, X, AlertTriangle, Copy, Loader2, ChevronDown } from 'lucide-react';
+import { Check, X, AlertTriangle, Loader2, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // BUTTON
@@ -19,28 +19,28 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || loading}
         className={cn(
-          'inline-flex items-center justify-center font-medium rounded-md transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-[#1A1A1A] disabled:opacity-50 disabled:pointer-events-none select-none',
+          'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 focus:outline-none disabled:opacity-50 disabled:pointer-events-none select-none active:scale-[0.98]',
           {
-            // Primary: neutral dark charcoal color (graphite vibe)
-            'bg-[#1A1A1A] text-white hover:bg-[#333333] border border-transparent':
+            // Primary: solid accent color (usually dark/black in light mode, white in dark mode)
+            'bg-accent text-background hover:opacity-90 border border-transparent':
               variant === 'primary',
-            // Secondary: clean, light border with subtle gray text and neutral bg
-            'bg-white text-[#1A1A1A] border border-[#EDEDED] hover:bg-[#F5F5F4]':
+            // Secondary: clean, light border with text-primary and surface/surface-secondary hover
+            'bg-surface text-text-primary border border-border/80 hover:bg-surface-secondary':
               variant === 'secondary',
-            // Danger: soft warning / deletion red
-            'bg-[#FEF2F2] text-[#991B1B] border border-[#FEE2E2] hover:bg-[#FEE2E2]':
+            // Danger: danger red colored button (soft bg)
+            'bg-danger/10 text-danger border border-danger/20 hover:bg-danger/20':
               variant === 'danger',
-            // Accent: slate gray moss look
-            'bg-[#E7F5EF] text-[#059669] border border-[#D1FAE5] hover:bg-[#D1FAE5]':
+            // Accent: soft success green colored button
+            'bg-success/10 text-success border border-success/20 hover:bg-success/20':
               variant === 'accent',
             // Ghost: completely transparent
-            'bg-transparent text-[#666666] hover:bg-[#F5F5F4] hover:text-[#1A1A1A]':
+            'bg-transparent text-text-secondary hover:bg-surface-secondary hover:text-text-primary':
               variant === 'ghost',
           },
           {
-            'px-2.5 py-1 text-xs': size === 'sm',
-            'px-4 py-2 text-sm': size === 'md',
-            'px-5 py-2.5 text-base': size === 'lg',
+            'px-3 py-1.5 text-xs': size === 'sm',
+            'px-4.5 py-2.5 text-xs': size === 'md',
+            'px-5.5 py-3 text-sm': size === 'lg',
           },
           className
         )}
@@ -56,27 +56,31 @@ Button.displayName = 'Button';
 
 // INPUT
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label?: string;
   error?: string;
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, error, type = 'text', ...props }, ref) => {
+  ({ className, label, error, type = 'text', ...props }, ref) => {
     return (
-      <div className="w-full">
+      <div className="space-y-1.5 w-full">
+        {label && (
+          <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block">
+            {label}
+          </label>
+        )}
         <input
           ref={ref}
           type={type}
           className={cn(
-            'w-full bg-white border border-[#EDEDED] rounded-md px-3 py-1.5 text-sm text-[#1A1A1A] placeholder-[#666666]/50 focus:outline-none focus:ring-1 focus:ring-[#1A1A1A] focus:border-[#1A1A1A] transition-all duration-150',
-            {
-              'border-red-300 focus:ring-red-400 focus:border-red-400': !!error,
-            },
+            'w-full bg-surface border rounded-xl px-3.5 py-2.5 text-xs text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:border-accent font-medium transition-colors',
+            error ? 'border-danger' : 'border-border/80',
             className
           )}
           {...props}
         />
         {error && (
-          <p className="mt-1 text-xs text-red-500 font-medium">{error}</p>
+          <p className="text-[10px] text-danger mt-0.5">{error}</p>
         )}
       </div>
     );
@@ -86,26 +90,30 @@ Input.displayName = 'Input';
 
 // TEXTAREA
 export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label?: string;
   error?: string;
 }
 
 export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className, error, ...props }, ref) => {
+  ({ className, label, error, ...props }, ref) => {
     return (
-      <div className="w-full">
+      <div className="space-y-1.5 w-full">
+        {label && (
+          <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block">
+            {label}
+          </label>
+        )}
         <textarea
           ref={ref}
           className={cn(
-            'w-full bg-white border border-[#EDEDED] rounded-md px-3 py-1.5 text-sm text-[#1A1A1A] placeholder-[#666666]/50 focus:outline-none focus:ring-1 focus:ring-[#1A1A1A] focus:border-[#1A1A1A] transition-all duration-150 resize-y min-h-[80px]',
-            {
-              'border-red-300 focus:ring-red-400 focus:border-red-400': !!error,
-            },
+            'w-full bg-surface border rounded-xl px-3.5 py-2.5 text-xs text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:border-accent font-medium transition-colors resize-y min-h-[80px]',
+            error ? 'border-danger' : 'border-border/80',
             className
           )}
           {...props}
         />
         {error && (
-          <p className="mt-1 text-xs text-red-500 font-medium">{error}</p>
+          <p className="text-[10px] text-danger mt-0.5">{error}</p>
         )}
       </div>
     );
@@ -121,32 +129,39 @@ export interface SelectOption {
 
 export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   options: SelectOption[];
+  label?: string;
   error?: string;
 }
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, options, error, ...props }, ref) => {
+  ({ className, options, label, error, ...props }, ref) => {
     return (
-      <div className="w-full">
-        <select
-          ref={ref}
-          className={cn(
-            'w-full bg-white border border-[#EDEDED] rounded-md px-3 py-1.5 text-sm text-[#1A1A1A] focus:outline-none focus:ring-1 focus:ring-[#1A1A1A] focus:border-[#1A1A1A] transition-all duration-150 appearance-none cursor-pointer',
-            {
-              'border-red-300 focus:ring-red-400 focus:border-red-400': !!error,
-            },
-            className
-          )}
-          {...props}
-        >
-          {options.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+      <div className="space-y-1.5 w-full">
+        {label && (
+          <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block">
+            {label}
+          </label>
+        )}
+        <div className="relative">
+          <select
+            ref={ref}
+            className={cn(
+              'w-full bg-surface border rounded-xl px-3.5 py-2.5 text-xs text-text-primary focus:outline-none focus:border-accent transition-all duration-150 appearance-none cursor-pointer pr-10 font-medium',
+              error ? 'border-danger' : 'border-border/80',
+              className
+            )}
+            {...props}
+          >
+            {options.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="w-4 h-4 text-text-secondary absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        </div>
         {error && (
-          <p className="mt-1 text-xs text-red-500 font-medium">{error}</p>
+          <p className="text-[10px] text-danger mt-0.5">{error}</p>
         )}
       </div>
     );
@@ -205,7 +220,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          'w-full flex items-center justify-between bg-white border border-[#EDEDED] rounded-md px-3 py-1.5 text-xs text-[#1A1A1A] hover:bg-[#F5F5F4] focus:outline-none focus:ring-1 focus:ring-[#1A1A1A] transition-all duration-150 appearance-none cursor-pointer select-none text-left min-h-[34px]',
+          'w-full flex items-center justify-between bg-surface border border-border/80 rounded-xl px-3.5 py-2.5 text-xs text-text-primary hover:bg-surface-secondary focus:outline-none focus:border-accent transition-all duration-150 appearance-none cursor-pointer select-none text-left min-h-[34px] font-medium shadow-sm',
           disabled && 'opacity-50 pointer-events-none'
         )}
       >
@@ -216,23 +231,23 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
               <span>{selectedOption.label}</span>
             </>
           ) : (
-            <span className="text-neutral-400">{placeholder}</span>
+            <span className="text-text-secondary/60">{placeholder}</span>
           )}
         </span>
-        <ChevronDown className={cn('w-3.5 h-3.5 text-[#1A1A1A]/50 transition-transform duration-150 flex-shrink-0 ml-2', isOpen && 'transform rotate-180')} />
+        <ChevronDown className={cn('w-3.5 h-3.5 text-text-secondary transition-transform duration-150 flex-shrink-0 ml-2', isOpen && 'transform rotate-180')} />
       </button>
 
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 4, scale: 0.98 }}
+            initial={{ opacity: 0, y: -5, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 4, scale: 0.98 }}
-            transition={{ duration: 0.12, ease: 'easeOut' }}
-            className="absolute left-0 right-0 mt-1 bg-white border border-[#EDEDED] rounded-md shadow-lg z-50 py-1 max-h-[220px] overflow-y-auto scrollbar-none"
+            exit={{ opacity: 0, y: -5, scale: 0.98 }}
+            transition={{ duration: 0.15 }}
+            className="absolute left-0 right-0 mt-2 bg-surface border border-border shadow-lg rounded-xl z-50 py-1 max-h-60 overflow-y-auto scrollbar-none"
           >
             {options.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-neutral-400 italic">Нет доступных опций</div>
+              <div className="px-4 py-2.5 text-xs text-text-secondary italic">Нет доступных опций</div>
             ) : (
               options.map((opt) => {
                 const isSelected = opt.value === value;
@@ -246,8 +261,8 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                       setIsOpen(false);
                     }}
                     className={cn(
-                      'w-full text-left px-3 py-1.5 text-xs text-[#1A1A1A] hover:bg-[#F5F5F4] transition-colors flex items-center justify-between gap-2',
-                      isSelected && 'bg-neutral-50 font-semibold',
+                      'w-full text-left px-4 py-2.5 text-xs text-text-primary hover:bg-surface-secondary transition-colors flex items-center justify-between gap-2',
+                      isSelected && 'bg-accent/10 text-accent font-semibold',
                       opt.disabled && 'opacity-40 cursor-not-allowed pointer-events-none'
                     )}
                   >
@@ -255,7 +270,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                       {opt.icon}
                       <span>{opt.label}</span>
                     </span>
-                    {isSelected && <Check className="w-3.5 h-3.5 text-neutral-800 stroke-[3.5] flex-shrink-0" />}
+                    {isSelected && <Check className="w-3.5 h-3.5 text-accent stroke-[3.5] flex-shrink-0" />}
                   </button>
                 );
               })
@@ -290,14 +305,14 @@ export const Badge: React.FC<BadgeProps> = ({
       id={id}
       onClick={onClick}
       className={cn(
-        'inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-semibold rounded-full select-none transition-colors duration-150',
+        'inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-semibold rounded-full select-none transition-colors duration-150 border',
         {
-          'bg-[#F5F5F5] text-[#666666] border border-transparent': variant === 'gray',
-          'bg-[#E7F5EF] text-[#059669] border border-transparent': variant === 'emerald',
-          'bg-[#FFF7ED] text-[#EA580C] border border-transparent': variant === 'amber',
-          'bg-[#EFF6FF] text-[#1E40AF] border border-transparent': variant === 'blue',
-          'bg-[#FEF2F2] text-[#991B1B] border border-transparent': variant === 'red',
-          'bg-[#F5F3FF] text-[#5B21B6] border border-transparent': variant === 'purple',
+          'bg-surface-secondary text-text-secondary border-border/40': variant === 'gray',
+          'bg-success/10 text-success border-success/20': variant === 'emerald',
+          'bg-warning/10 text-warning border-warning/20': variant === 'amber',
+          'bg-accent-soft text-text-primary border-border/50': variant === 'blue',
+          'bg-danger/10 text-danger border-danger/20': variant === 'red',
+          'bg-purple-500/10 text-purple-600 border-purple-500/20': variant === 'purple',
           'cursor-pointer hover:brightness-95': !!onClick,
         },
         className
@@ -328,7 +343,7 @@ export const Skeleton: React.FC<{ className?: string; count?: number }> = ({ cla
         <div
           key={idx}
           className={cn(
-            'animate-pulse bg-neutral-100 rounded-md h-4 w-full',
+            'animate-pulse bg-surface-secondary rounded-xl h-4 w-full',
             className
           )}
         />
@@ -381,30 +396,30 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.15 } }}
               transition={{ duration: 0.2 }}
               className={cn(
-                'pointer-events-auto flex items-center gap-3 px-3.5 py-2.5 rounded-lg border shadow-sm text-sm font-medium bg-white border-neutral-200'
+                'pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl border shadow-lg text-xs font-semibold bg-surface border-border'
               )}
             >
               <div className="flex-shrink-0">
                 {t.type === 'success' && (
-                  <div className="w-5 h-5 rounded-full bg-neutral-900 text-white flex items-center justify-center">
+                  <div className="w-5 h-5 rounded-full bg-accent text-background flex items-center justify-center">
                     <Check className="w-3 h-3 stroke-[3]" />
                   </div>
                 )}
                 {t.type === 'error' && (
-                  <div className="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
+                  <div className="w-5 h-5 rounded-full bg-danger/10 text-danger flex items-center justify-center">
                     <AlertTriangle className="w-3 h-3" />
                   </div>
                 )}
                 {t.type === 'info' && (
-                  <div className="w-5 h-5 rounded-full bg-neutral-100 text-neutral-600 flex items-center justify-center">
+                  <div className="w-5 h-5 rounded-full bg-surface-secondary text-text-secondary flex items-center justify-center">
                     <Check className="w-3 h-3" />
                   </div>
                 )}
               </div>
-              <p className="flex-1 text-neutral-800">{t.message}</p>
+              <p className="flex-1 text-text-primary">{t.message}</p>
               <button
                 onClick={() => removeToast(t.id)}
-                className="text-neutral-400 hover:text-neutral-600 focus:outline-none p-0.5 rounded-md hover:bg-neutral-50 transition-colors duration-150"
+                className="text-text-secondary hover:text-text-primary focus:outline-none p-0.5 rounded-xl hover:bg-surface-secondary transition-colors duration-150"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -455,36 +470,36 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            animate={{ opacity: 0.5 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-neutral-900/10 backdrop-blur-[1px] transition-all duration-150"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-all duration-150"
           />
 
           {/* Modal Container */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.15 }}
-            className="relative bg-white border border-[#EDEDED] rounded-lg shadow-xl max-w-sm w-full p-6 overflow-hidden z-10"
+            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 15 }}
+            transition={{ type: 'spring', duration: 0.4, bounce: 0.15 }}
+            className="relative bg-surface border border-border rounded-3xl shadow-2xl max-w-sm w-full p-6 overflow-hidden z-50"
           >
             <div className="flex items-start gap-3">
               <div
                 className={cn(
-                  'p-2 rounded-lg flex-shrink-0',
-                  variant === 'danger' ? 'bg-red-50 text-red-600' : 'bg-neutral-150 text-neutral-700'
+                  'p-2 rounded-xl flex-shrink-0',
+                  variant === 'danger' ? 'bg-danger/10 text-danger border border-danger/20' : 'bg-surface-secondary text-text-secondary border border-border/80'
                 )}
               >
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-semibold text-neutral-800">{title}</h3>
-                <p className="mt-1.5 text-sm text-neutral-500 font-normal leading-relaxed">{message}</p>
+                <h3 className="text-sm font-bold tracking-tight text-text-primary">{title}</h3>
+                <p className="mt-1.5 text-xs text-text-secondary font-medium leading-relaxed">{message}</p>
               </div>
             </div>
 
-            <div className="mt-5 flex items-center justify-end gap-2.5">
+            <div className="mt-6 flex items-center justify-end gap-2">
               <Button size="sm" variant="ghost" onClick={onClose}>
                 {cancelLabel}
               </Button>

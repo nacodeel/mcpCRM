@@ -107,7 +107,7 @@ export default function ContactsPage() {
       sortable: true,
       render: (contact) => (
         <div className="flex items-center gap-2.5">
-          <span className="font-semibold text-neutral-800 hover:text-neutral-900 leading-normal">{contact.name}</span>
+          <span className="font-bold text-text-primary hover:text-accent leading-normal transition-colors">{contact.name}</span>
         </div>
       )
     },
@@ -118,12 +118,12 @@ export default function ContactsPage() {
         <div className="flex flex-col gap-1 max-w-[170px]">
           {contact.phones.length > 0 ? (
             contact.phones.map((p, idx) => (
-              <span key={idx} className="inline-flex items-center text-[11px] text-[#1A1A1A] font-medium bg-[#F5F5F4] border border-[#EDEDED] px-1.5 py-0.5 rounded-md truncate">
+              <span key={idx} className="inline-flex items-center text-[10px] text-text-primary font-bold bg-surface-secondary border border-border/80 px-2 py-0.5 rounded-xl truncate">
                 {p}
               </span>
             ))
           ) : (
-            <span className="text-xs text-neutral-300">—</span>
+            <span className="text-xs text-text-secondary/40">—</span>
           )}
         </div>
       )
@@ -135,12 +135,12 @@ export default function ContactsPage() {
         <div className="flex flex-col gap-1 max-w-[200px]">
           {contact.emails.length > 0 ? (
             contact.emails.map((e, idx) => (
-              <span key={idx} className="inline-flex items-center text-[11px] text-[#1A1A1A] font-mono bg-[#F9F9F8] border border-[#EDEDED] px-1.5 py-0.5 rounded-md truncate">
+              <span key={idx} className="inline-flex items-center text-[10px] text-text-primary font-mono font-bold bg-surface-secondary border border-border/80 px-2 py-0.5 rounded-xl truncate">
                 {e}
               </span>
             ))
           ) : (
-            <span className="text-xs text-neutral-300">—</span>
+            <span className="text-xs text-text-secondary/40">—</span>
           )}
         </div>
       )
@@ -157,7 +157,7 @@ export default function ContactsPage() {
               </Badge>
             ))
           ) : (
-            <span className="text-xs text-neutral-300">—</span>
+            <span className="text-xs text-text-secondary/40">—</span>
           )}
         </div>
       )
@@ -169,12 +169,12 @@ export default function ContactsPage() {
         const count = contact.dealIds.length;
         if (count > 0) {
           return (
-            <Badge variant="emerald" className="font-medium">
+            <Badge variant="emerald" className="font-bold">
               {count} {count === 1 ? 'сделка' : count < 5 ? 'сделки' : 'сделок'}
             </Badge>
           );
         }
-        return <span className="text-xs text-neutral-300">—</span>;
+        return <span className="text-xs text-text-secondary/40">—</span>;
       }
     },
     {
@@ -182,7 +182,7 @@ export default function ContactsPage() {
       header: 'Обновлён',
       sortable: true,
       render: (contact) => (
-        <span className="text-xs text-neutral-400 font-mono">
+        <span className="text-xs text-text-secondary font-mono font-semibold">
           {formatDate(contact.updatedAt)}
         </span>
       )
@@ -199,13 +199,13 @@ export default function ContactsPage() {
             title="Редактировать"
             onClick={() => openEditContact(contact)}
           >
-            <Edit3 className="w-3.5 h-3.5 text-neutral-500" />
+            <Edit3 className="w-3.5 h-3.5 text-text-secondary hover:text-text-primary" />
           </Button>
           <Button
             size="sm"
             variant="ghost"
             title="Удалить"
-            className="hover:text-red-600 hover:bg-red-50"
+            className="hover:text-danger hover:bg-danger/10"
             onClick={(e) => initiateDeleteContact(contact.id, e)}
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -235,10 +235,10 @@ export default function ContactsPage() {
       />
 
       {/* SEARCH & FILTER CONTROLS */}
-      <div className="bg-white border border-[#EDEDED] rounded-lg p-4 space-y-3 shadow-none select-none">
+      <div className="bg-surface border border-border/80 rounded-2xl p-4 space-y-3 shadow-sm select-none">
         <div className="flex flex-col sm:flex-row gap-2.5">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-[#666666]/60" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary/60" />
             <input
               type="text"
               placeholder="Поиск по имени, email, телефону или тегу..."
@@ -247,7 +247,7 @@ export default function ContactsPage() {
                 setContactsSearch(e.target.value);
                 setContactsPage(1);
               }}
-              className="w-full bg-white border border-[#EDEDED] rounded-md pl-9 pr-4 py-2 text-xs text-[#1A1A1A] placeholder-[#666666]/50 focus:outline-none focus:ring-1 focus:ring-[#1A1A1A] focus:border-[#1A1A1A] transition-all duration-150"
+              className="w-full bg-surface border border-border/80 rounded-xl pl-9 pr-10 py-2.5 text-xs text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:border-accent font-medium transition-colors"
             />
             {contactsSearch && (
               <button
@@ -255,9 +255,9 @@ export default function ContactsPage() {
                   setContactsSearch('');
                   setContactsPage(1);
                 }}
-                className="absolute right-3 top-2.5 p-0.5 text-[#666666] hover:text-[#1A1A1A] hover:bg-[#F5F5F4] rounded-full transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-text-secondary hover:text-text-primary hover:bg-surface-secondary rounded-full transition-colors"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
@@ -314,8 +314,8 @@ export default function ContactsPage() {
 
         {/* ACTIVE FILTER CHIPS ROW */}
         {(contactsSearch || contactsFilterTag !== 'all' || contactsFilterHasDeals !== 'all' || contactsFilterDate !== 'all') && (
-          <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-neutral-100 text-xs text-neutral-400">
-            <span className="font-normal text-neutral-400">Активные фильтры:</span>
+          <div className="flex flex-wrap items-center gap-1.5 pt-3 border-t border-border text-xs text-text-secondary font-medium">
+            <span className="font-semibold text-text-secondary">Активные фильтры:</span>
             {contactsSearch && (
               <Badge variant="gray" onRemove={() => { setContactsSearch(''); setContactsPage(1); }}>
                 Поиск: {contactsSearch}
@@ -344,7 +344,7 @@ export default function ContactsPage() {
                 setContactsFilterDate('all');
                 setContactsPage(1);
               }}
-              className="text-[11px] font-semibold text-neutral-700 hover:text-neutral-900 cursor-pointer hover:underline transition-all duration-150 ml-1"
+              className="text-[10px] font-bold text-text-secondary hover:text-text-primary cursor-pointer hover:underline transition-all duration-150 ml-1.5 uppercase tracking-wider"
             >
               Сбросить фильтры
             </button>

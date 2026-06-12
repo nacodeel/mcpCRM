@@ -118,9 +118,9 @@ export default function DealsPage() {
       sortable: true,
       render: (deal) => (
         <div className="flex flex-col">
-          <span className="font-semibold text-neutral-800 leading-normal">{deal.title}</span>
+          <span className="font-bold text-text-primary hover:text-accent leading-normal transition-colors">{deal.title}</span>
           {deal.description && (
-            <span className="text-[11px] text-neutral-400 truncate max-w-[220px] font-normal leading-normal mt-0.5">
+            <span className="text-[10px] text-text-secondary truncate max-w-[220px] font-medium leading-normal mt-0.5">
               {deal.description}
             </span>
           )}
@@ -135,13 +135,13 @@ export default function DealsPage() {
         if (contact) {
           return (
             <div className="flex items-center gap-1.5 hover:underline" onClick={(e) => { e.stopPropagation(); handleDealContactClick(deal.contactId); }}>
-              <span className="text-xs text-neutral-700 font-medium truncate max-w-[120px]">
+              <span className="text-xs text-text-primary hover:text-accent font-semibold truncate max-w-[120px] transition-colors">
                 {contact.name}
               </span>
             </div>
           );
         }
-        return <span className="text-xs text-red-400">Удален или отсутствует</span>;
+        return <span className="text-xs text-danger font-medium">Удален или отсутствует</span>;
       }
     },
     {
@@ -149,7 +149,7 @@ export default function DealsPage() {
       header: 'Сумма',
       sortable: true,
       render: (deal) => (
-        <span className="font-medium text-neutral-800">
+        <span className="font-bold text-text-primary">
           {formatMoney(deal.amount)}
         </span>
       )
@@ -158,7 +158,7 @@ export default function DealsPage() {
       key: 'status',
       header: 'Статус',
       render: (deal) => (
-        <Badge variant={getDealStatusBadgeVariant(deal.status)} className="font-semibold text-[11px]">
+        <Badge variant={getDealStatusBadgeVariant(deal.status)} className="font-bold text-[10px]">
           {deal.status}
         </Badge>
       )
@@ -168,7 +168,7 @@ export default function DealsPage() {
       header: 'Обновлена',
       sortable: true,
       render: (deal) => (
-        <span className="text-xs text-neutral-400 font-mono">
+        <span className="text-xs text-text-secondary font-mono font-semibold">
           {formatDate(deal.updatedAt)}
         </span>
       )
@@ -185,13 +185,13 @@ export default function DealsPage() {
             title="Редактировать"
             onClick={() => openEditDeal(deal)}
           >
-            <Edit3 className="w-3.5 h-3.5 text-neutral-500" />
+            <Edit3 className="w-3.5 h-3.5 text-text-secondary hover:text-text-primary" />
           </Button>
           <Button
             size="sm"
             variant="ghost"
             title="Удалить"
-            className="hover:text-red-600 hover:bg-red-50"
+            className="hover:text-danger hover:bg-danger/10"
             onClick={(e) => initiateDeleteDeal(deal.id, e)}
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -221,10 +221,10 @@ export default function DealsPage() {
       />
 
       {/* SEARCH & FILTERS FOR DEALS */}
-      <div className="bg-white border border-[#EDEDED] rounded-lg p-4 space-y-3 shadow-none select-none">
+      <div className="bg-surface border border-border/80 rounded-2xl p-4 space-y-3 shadow-sm select-none">
         <div className="flex flex-col sm:flex-row gap-2.5">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-[#666666]/60" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary/60" />
             <input
               type="text"
               placeholder="Поиск по названию сделки, КП, описанию или клиенту..."
@@ -233,7 +233,7 @@ export default function DealsPage() {
                 setDealsSearch(e.target.value);
                 setDealsPage(1);
               }}
-              className="w-full bg-white border border-[#EDEDED] rounded-md pl-9 pr-4 py-2 text-xs text-[#1A1A1A] placeholder-[#666666]/50 focus:outline-none focus:ring-1 focus:ring-[#1A1A1A] focus:border-[#1A1A1A] transition-all duration-150"
+              className="w-full bg-surface border border-border/80 rounded-xl pl-9 pr-10 py-2.5 text-xs text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:border-accent font-medium transition-colors"
             />
             {dealsSearch && (
               <button
@@ -241,9 +241,9 @@ export default function DealsPage() {
                   setDealsSearch('');
                   setDealsPage(1);
                 }}
-                className="absolute right-3 top-2.5 p-0.5 text-[#666666] hover:text-[#1A1A1A] hover:bg-[#F5F5F4] rounded-full transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-text-secondary hover:text-text-primary hover:bg-surface-secondary rounded-full transition-colors"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
@@ -304,7 +304,7 @@ export default function DealsPage() {
         {/* Amount range filtering input */}
         <div className="flex flex-wrap items-center gap-4 text-xs select-none">
           <div className="flex items-center gap-1.5">
-            <span className="text-neutral-400">Сумма от:</span>
+            <span className="text-text-secondary font-medium">Сумма от:</span>
             <input
               type="number"
               placeholder="0"
@@ -313,12 +313,12 @@ export default function DealsPage() {
                 setDealsMinAmount(e.target.value);
                 setDealsPage(1);
               }}
-              className="w-24 bg-neutral-50 border border-neutral-200 rounded px-2 py-1 text-xs text-neutral-800 placeholder-neutral-300 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:bg-white"
+              className="w-24 bg-surface border border-border/80 rounded-xl px-3 py-1.5 text-xs text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-accent font-medium"
             />
           </div>
 
           <div className="flex items-center gap-1.5">
-            <span className="text-neutral-400">до:</span>
+            <span className="text-text-secondary font-medium">до:</span>
             <input
               type="number"
               placeholder="999 999"
@@ -327,9 +327,9 @@ export default function DealsPage() {
                 setDealsMaxAmount(e.target.value);
                 setDealsPage(1);
               }}
-              className="w-24 bg-neutral-50 border border-neutral-200 rounded px-2 py-1 text-xs text-neutral-800 placeholder-neutral-300 focus:outline-none focus:ring-1 focus:ring-neutral-400 focus:bg-white"
+              className="w-24 bg-surface border border-border/80 rounded-xl px-3 py-1.5 text-xs text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-accent font-medium"
             />
-            <span className="text-neutral-400">₽</span>
+            <span className="text-text-secondary font-semibold">₽</span>
           </div>
 
           {/* RESET BUTTON */}
@@ -340,7 +340,7 @@ export default function DealsPage() {
                 setDealsMaxAmount('');
                 setDealsPage(1);
               }}
-              className="text-[11px] font-semibold text-neutral-600 hover:text-neutral-800 hover:underline cursor-pointer"
+              className="text-[10px] font-bold text-text-secondary hover:text-text-primary hover:underline cursor-pointer uppercase tracking-wider ml-1"
             >
               Сбросить сумму
             </button>
@@ -349,8 +349,8 @@ export default function DealsPage() {
 
         {/* ACTIVE CHIP CHURN */}
         {(dealsSearch || dealsFilterStatus !== 'all' || dealsFilterContact !== 'all' || dealsFilterDate !== 'all' || dealsMinAmount || dealsMaxAmount) && (
-          <div className="flex flex-wrap items-center gap-1.5 pt-2.5 border-t border-neutral-100 text-xs text-neutral-400">
-            <span className="font-normal text-neutral-400">Активные фильтры:</span>
+          <div className="flex flex-wrap items-center gap-1.5 pt-3 border-t border-border text-xs text-text-secondary font-medium">
+            <span className="font-semibold text-text-secondary">Активные фильтры:</span>
             {dealsSearch && (
               <Badge variant="gray" onRemove={() => { setDealsSearch(''); setDealsPage(1); }}>
                 Поиск: {dealsSearch}
@@ -389,7 +389,7 @@ export default function DealsPage() {
                 setDealsMaxAmount('');
                 setDealsPage(1);
               }}
-              className="text-[11px] font-bold text-neutral-700 hover:text-neutral-900 cursor-pointer hover:underline transition-all duration-150 ml-1"
+              className="text-[10px] font-bold text-text-secondary hover:text-text-primary cursor-pointer hover:underline transition-all duration-150 ml-1.5 uppercase tracking-wider"
             >
               Сбросить все
             </button>

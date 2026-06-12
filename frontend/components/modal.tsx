@@ -41,14 +41,14 @@ export const ResponsiveModal: React.FC<ResponsiveModalProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          animate={{ opacity: 0.5 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="fixed inset-0 bg-neutral-900/10 backdrop-blur-[1px] transition-all duration-150"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-all duration-150"
         />
 
         {isMobile ? (
@@ -59,49 +59,49 @@ export const ResponsiveModal: React.FC<ResponsiveModalProps> = ({
             exit={{ y: '100%' }}
             transition={{ type: 'tween', ease: 'easeInOut', duration: 0.2 }}
             className={cn(
-              'fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-xl flex flex-col max-h-[92vh] border-t border-neutral-200/60 pb-safe',
+              'fixed bottom-0 left-0 right-0 z-50 bg-surface rounded-t-3xl shadow-2xl flex flex-col max-h-[92vh] border-t border-border pb-safe select-none',
               className
             )}
           >
             {/* Drag Handle Indicator */}
-            <div className="flex justify-center py-2.5 flex-shrink-0 cursor-pointer" onClick={onClose}>
-              <div className="w-10 h-1 bg-neutral-200 rounded-full" />
+            <div className="flex justify-center py-3 flex-shrink-0 cursor-pointer" onClick={onClose}>
+              <div className="w-10 h-1 bg-border rounded-full" />
             </div>
 
             {/* Header */}
-            <div className="px-5 pb-3 pt-1 border-b border-neutral-100 flex items-center justify-between flex-shrink-0">
-              <h2 className="text-base font-semibold text-neutral-800">{title}</h2>
+            <div className="px-6 pb-4 pt-1 border-b border-border flex items-center justify-between flex-shrink-0 bg-surface-secondary/20">
+              <h2 className="text-sm font-bold tracking-tight text-text-primary">{title}</h2>
               <button
                 onClick={onClose}
-                className="p-1 px-1.5 text-xs text-neutral-400 hover:text-neutral-600 rounded-lg hover:bg-neutral-50 flex items-center justify-center transition-all duration-150"
+                className="p-2 rounded-xl bg-surface-secondary/60 text-text-secondary hover:text-text-primary border border-border/40 transition-all active:scale-95"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Content Area - Scrollable */}
-            <div className="flex-1 overflow-y-auto px-5 py-4">
+            <div className="flex-1 overflow-y-auto px-6 py-5">
               {children}
             </div>
           </motion.div>
         ) : (
-          /* DESKTOP DESK CENTRED MODAL */
+          /* DESKTOP CENTRED MODAL */
           <motion.div
-            initial={{ opacity: 0, scale: 0.98, y: 8 }}
+            initial={{ opacity: 0, scale: 0.95, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98, y: 8 }}
-            transition={{ type: 'tween', ease: 'easeOut', duration: 0.15 }}
+            exit={{ opacity: 0, scale: 0.95, y: 15 }}
+            transition={{ type: 'spring', duration: 0.4, bounce: 0.15 }}
             className={cn(
-              'relative bg-white rounded-xl shadow-xl border border-neutral-100 max-w-xl w-full flex flex-col max-h-[85vh] z-50 overflow-hidden',
+              'relative bg-surface border border-border rounded-3xl shadow-2xl max-w-xl w-full flex flex-col max-h-[90vh] z-50 overflow-hidden select-none',
               className
             )}
           >
             {/* Header */}
-            <div className="px-6 py-4 border-b border-neutral-100 flex items-center justify-between flex-shrink-0 bg-neutral-50/50">
-              <h2 className="text-base font-semibold text-neutral-800">{title}</h2>
+            <div className="px-6 py-5 border-b border-border flex items-center justify-between flex-shrink-0 bg-surface-secondary/20">
+              <h2 className="text-sm font-bold tracking-tight text-text-primary">{title}</h2>
               <button
                 onClick={onClose}
-                className="p-1 text-neutral-400 hover:text-neutral-600 rounded-lg hover:bg-neutral-100 flex items-center justify-center transition-all duration-150"
+                className="p-2 rounded-xl bg-surface-secondary/60 text-text-secondary hover:text-text-primary border border-border/40 transition-all active:scale-95"
               >
                 <X className="w-4 h-4" />
               </button>

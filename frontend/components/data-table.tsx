@@ -62,20 +62,20 @@ export const Pagination: React.FC<PaginationProps> = ({
   };
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-3 px-4 sm:px-6 border-t border-[#EDEDED] bg-[#F9F9F8] rounded-b-lg text-xs font-normal text-[#666666]">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-3.5 px-4 sm:px-6 border-t border-border bg-surface-secondary/20 rounded-b-2xl text-[10px] font-bold text-text-secondary uppercase tracking-wider">
       {/* Summary Info */}
       <div className="flex flex-col sm:flex-row items-center gap-3">
-        <span className="font-normal text-[#666666]">
-          Показано <strong className="font-semibold text-[#1A1A1A]">{startItem}–{endItem}</strong> из <strong className="font-semibold text-[#1A1A1A]">{totalCount}</strong>
+        <span className="font-semibold text-text-secondary tracking-normal lowercase first-letter:uppercase">
+          Показано <strong className="font-bold text-text-primary">{startItem}–{endItem}</strong> из <strong className="font-bold text-text-primary">{totalCount}</strong>
         </span>
 
         {/* Page Size Selector */}
-        <div className="flex items-center gap-1.5 ml-0 sm:ml-4 border-l sm:border-l border-[#EDEDED] pl-0 sm:pl-4">
-          <span className="text-[#666666]">Показывать по:</span>
+        <div className="flex items-center gap-1.5 ml-0 sm:ml-4 border-l sm:border-l border-border pl-0 sm:pl-4 normal-case tracking-normal">
+          <span className="text-text-secondary">Показывать по:</span>
           <select
             value={pageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            className="bg-transparent border border-[#EDEDED] text-[#1A1A1A] text-xs rounded px-1.5 py-0.5 outline-none cursor-pointer hover:bg-neutral-100 transition-colors duration-150 font-medium"
+            className="bg-surface border border-border text-text-primary text-xs rounded-xl px-2.5 py-1 outline-none cursor-pointer hover:bg-surface-secondary transition-colors duration-150 font-bold"
           >
             {[20, 50, 100].map((size) => (
               <option key={size} value={size}>
@@ -87,11 +87,11 @@ export const Pagination: React.FC<PaginationProps> = ({
       </div>
 
       {/* Page Controls Map */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="px-2 py-1 text-xs border border-[#EDEDED] bg-white text-[#666666] hover:bg-gray-100 rounded disabled:opacity-40 disabled:pointer-events-none transition-colors duration-150 flex items-center justify-center h-7"
+          className="px-2.5 py-1 text-xs border border-border/80 bg-surface text-text-secondary hover:bg-surface-secondary rounded-xl disabled:opacity-40 disabled:pointer-events-none transition-all duration-150 flex items-center justify-center h-8 w-8 active:scale-95"
         >
           <ChevronLeft className="w-3.5 h-3.5" />
         </button>
@@ -100,15 +100,15 @@ export const Pagination: React.FC<PaginationProps> = ({
           {getPageNumbers().map((pageNum, idx) => (
             <React.Fragment key={idx}>
               {pageNum === '...' ? (
-                <span className="px-2 py-1 text-[#666666] select-none">...</span>
+                <span className="px-2.5 py-1 text-text-secondary select-none tracking-normal">...</span>
               ) : (
                 <button
                   onClick={() => onPageChange(Number(pageNum))}
                   className={cn(
-                    'px-3 py-1 text-xs font-semibold rounded border transition-colors duration-150 h-7 flex items-center justify-center',
+                    'px-3.5 py-1 text-xs font-bold rounded-xl border transition-all duration-150 h-8 flex items-center justify-center active:scale-95 min-w-[32px]',
                     currentPage === pageNum
-                      ? 'bg-[#1A1A1A] border-[#EDEDED] text-white'
-                      : 'border-[#EDEDED] bg-white text-[#666666] hover:bg-gray-100'
+                      ? 'bg-accent border-transparent text-background shadow-sm shadow-accent/10'
+                      : 'border-border/80 bg-surface text-text-secondary hover:bg-surface-secondary'
                   )}
                 >
                   {pageNum}
@@ -121,7 +121,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="px-2 py-1 text-xs border border-[#EDEDED] bg-white text-[#666666] hover:bg-gray-100 rounded disabled:opacity-40 disabled:pointer-events-none transition-colors duration-150 flex items-center justify-center h-7"
+          className="px-2.5 py-1 text-xs border border-border/80 bg-surface text-text-secondary hover:bg-surface-secondary rounded-xl disabled:opacity-40 disabled:pointer-events-none transition-all duration-150 flex items-center justify-center h-8 w-8 active:scale-95"
         >
           <ChevronRight className="w-3.5 h-3.5" />
         </button>
@@ -138,12 +138,12 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   onAction,
 }) => {
   return (
-    <div className="flex flex-col items-center justify-center text-center p-8 sm:p-12 border border-neutral-150 rounded-xl bg-white">
-      <div className="w-12 h-12 bg-neutral-50 border border-neutral-150 rounded-full flex items-center justify-center text-neutral-400 mb-4 animate-fade-in">
+    <div className="flex flex-col items-center justify-center text-center p-8 sm:p-12 border border-border rounded-2xl bg-surface shadow-sm">
+      <div className="w-12 h-12 bg-surface-secondary border border-border rounded-2xl flex items-center justify-center text-text-secondary mb-4 animate-fade-in">
         <Inbox className="w-5 h-5 stroke-[1.5]" />
       </div>
-      <h3 className="text-sm font-semibold text-neutral-800">{title}</h3>
-      <p className="mt-1.5 text-xs text-neutral-400 max-w-sm leading-relaxed">{description}</p>
+      <h3 className="text-sm font-bold text-text-primary tracking-tight">{title}</h3>
+      <p className="mt-1.5 text-xs text-text-secondary max-w-sm leading-relaxed font-medium">{description}</p>
       {actionLabel && onAction && (
         <Button size="sm" variant="primary" className="mt-5" onClick={onAction}>
           <Plus className="w-3.5 h-3.5 mr-1" />
@@ -175,11 +175,11 @@ export function DataTable<T extends { id: string | number }>({
   loading,
 }: DataTableProps<T>) {
   return (
-    <div className="w-full overflow-hidden border border-[#EDEDED] rounded-lg bg-white shadow-[0_1px_2px_rgba(0,0,0,0.01)]">
-      <div className="w-full overflow-x-auto min-h-[140px] relative">
+    <div className="w-full overflow-hidden border border-border rounded-2xl bg-surface shadow-sm">
+      <div className="w-full overflow-x-auto min-h-[140px] relative scrollbar-none">
         <table className="w-full border-collapse text-left text-sm table-auto">
           <thead>
-            <tr className="border-b border-[#EDEDED] bg-[#F9F9F8] text-[11px] font-semibold tracking-wider text-[#666666] uppercase select-none">
+            <tr className="border-b border-border bg-surface-secondary/40 text-[10px] font-bold tracking-wider text-text-secondary uppercase select-none">
               {columns.map((col) => {
                 const isSorted = sortField === col.key;
                 return (
@@ -188,7 +188,7 @@ export function DataTable<T extends { id: string | number }>({
                     onClick={() => col.sortable && onSort && onSort(col.key)}
                     style={{ width: col.width }}
                     className={cn(
-                      'px-5 py-3 font-semibold text-[#666666] hover:text-[#1A1A1A] transition-colors',
+                      'px-5 py-3.5 font-bold text-text-secondary hover:text-text-primary transition-colors',
                       col.sortable ? 'cursor-pointer' : '',
                       col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
                     )}
@@ -204,7 +204,7 @@ export function DataTable<T extends { id: string | number }>({
                         <ArrowUpDown
                           className={cn(
                             'w-3 h-3 transition-colors duration-150',
-                            isSorted ? 'text-[#1A1A1A] stroke-[2.5]' : 'text-neutral-300'
+                            isSorted ? 'text-text-primary stroke-[2.5]' : 'text-text-secondary/40'
                           )}
                         />
                       )}
@@ -218,10 +218,10 @@ export function DataTable<T extends { id: string | number }>({
             {loading ? (
               // SKELETON ROW SIMULATIONS
               Array.from({ length: 5 }).map((_, rIdx) => (
-                <tr key={rIdx} className="border-b border-[#EDEDED]">
+                <tr key={rIdx} className="border-b border-border last:border-b-0">
                   {columns.map((col, cIdx) => (
                     <td key={cIdx} className="px-5 py-4">
-                      <div className="h-3.5 bg-neutral-100/80 rounded animate-pulse" style={{ width: cIdx === 0 ? '60%' : '80%' }} />
+                      <div className="h-3.5 bg-surface-secondary rounded animate-pulse" style={{ width: cIdx === 0 ? '60%' : '80%' }} />
                     </td>
                   ))}
                 </tr>
@@ -229,7 +229,7 @@ export function DataTable<T extends { id: string | number }>({
             ) : data.length === 0 ? (
               // NO ROWS EMPTY CELL
               <tr>
-                <td colSpan={columns.length} className="px-5 py-12 text-center text-xs text-[#666666] bg-white">
+                <td colSpan={columns.length} className="px-5 py-12 text-center text-xs text-text-secondary bg-surface font-medium">
                   Нет данных для отображения. Измените параметры поиска или фильтров.
                 </td>
               </tr>
@@ -240,7 +240,7 @@ export function DataTable<T extends { id: string | number }>({
                   key={item.id}
                   onClick={() => onRowClick && onRowClick(item)}
                   className={cn(
-                    'border-b border-[#EDEDED] hover:bg-[#F9F9F8] active:bg-[#F5F5F4] transition-all duration-100 group select-none',
+                    'border-b border-border last:border-b-0 hover:bg-surface-secondary/40 active:bg-surface-secondary/80 transition-all duration-150 group select-none',
                     onRowClick ? 'cursor-pointer' : ''
                   )}
                 >
@@ -251,7 +251,7 @@ export function DataTable<T extends { id: string | number }>({
                       <td
                         key={col.key}
                         className={cn(
-                          'px-5 py-3.5 text-[#1A1A1A] text-sm font-normal transition-colors',
+                          'px-5 py-4 text-text-primary text-xs font-semibold transition-colors',
                           alignClass
                         )}
                       >
