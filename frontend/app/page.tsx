@@ -29,6 +29,7 @@ export default function CRMPage() {
   const [mcpKeys, setMcpKeys] = React.useState<any[]>([]);
   const [newMcpKeyName, setNewMcpKeyName] = React.useState('');
   const [newMcpKeyScopes, setNewMcpKeyScopes] = React.useState<string[]>([]);
+  const [selectedAccessLevel, setSelectedAccessLevel] = React.useState('crm:admin');
   const [mcpKeyLoading, setMcpKeyLoading] = React.useState(false);
   const [newRawToken, setNewRawToken] = React.useState<string | null>(null);
 
@@ -172,11 +173,12 @@ export default function CRMPage() {
       showToast('Введите название ключа', 'error');
       return;
     }
-    const res = await CrmApiClient.createMcpKey(newMcpKeyName, newMcpKeyScopes);
+    const scopes = selectedAccessLevel.split(',');
+    const res = await CrmApiClient.createMcpKey(newMcpKeyName, scopes);
     if (res.success && res.data) {
       setNewRawToken(res.data.raw_token);
       setNewMcpKeyName('');
-      setNewMcpKeyScopes([]);
+      setSelectedAccessLevel('crm:admin');
       showToast('Ключ успешно создан', 'success');
       fetchMcpKeys();
     } else {
@@ -185,13 +187,13 @@ export default function CRMPage() {
   };
 
   const handleDeleteMcpKey = async (id: number) => {
-    if (!confirm('Вы уверены, что хотите отозвать этот ключ?')) return;
+    if (!confirm('Вы уверены, что хотите удалить этот ключ? Ключ будет полностью и безвозвратно удален из базы данных.')) return;
     const res = await CrmApiClient.deleteMcpKey(id);
     if (res.success) {
-      showToast('Ключ отозван', 'success');
+      showToast('Ключ успешно удален из базы данных', 'success');
       fetchMcpKeys();
     } else {
-      showToast(res.error || 'Ошибка при удалении', 'error');
+      showToast(res.error || 'Ошибка при удалении ключа', 'error');
     }
   };
 
@@ -1632,8 +1634,8 @@ export default function CRMPage() {
                 </div>
 
                 {/* Create Key Form */}
-                <div className="flex flex-col sm:flex-row items-end gap-3 bg-neutral-50 p-4 rounded-lg border border-neutral-100">
-                  <div className="flex-1 w-full space-y-1.5">
+                <div className="flex flex-col md:flex-row items-end gap-3 bg-neutral-50 p-4 rounded-lg border border-neutral-100">
+                  <div className="flex-[2] w-full space-y-1.5">
                     <label className="text-xs font-semibold text-neutral-600 uppercase tracking-wide">Название ключа</label>
                     <Input
                       value={newMcpKeyName}
@@ -1642,7 +1644,20 @@ export default function CRMPage() {
                       maxLength={120}
                     />
                   </div>
-                  <Button onClick={handleCreateMcpKey} disabled={!newMcpKeyName.trim()} variant="primary" className="w-full sm:w-auto h-10">
+                  <div className="flex-1 w-full space-y-1.5">
+                    <label className="text-xs font-semibold text-neutral-600 uppercase tracking-wide">Права доступа</label>
+                    <Select
+                      value={selectedAccessLevel}
+                      onChange={(e) => setSelectedAccessLevel(e.target.value)}
+                      options={[
+                        { value: 'crm:admin', label: 'Администратор (Полный доступ)' },
+                        { value: 'crm:read', label: 'Только чтение' },
+                        { value: 'crm:read,contacts:write', label: 'Чтение и Запись (Без удаления)' },
+                        { value: 'crm:read,crm:write', label: 'Чтение, Запись и Удаление' },
+                      ]}
+                    />
+                  </div>
+                  <Button onClick={handleCreateMcpKey} disabled={!newMcpKeyName.trim()} variant="primary" className="w-full md:w-auto h-10">
                     <Plus className="w-4 h-4 mr-2" />
                     Выпустить ключ
                   </Button>
@@ -1681,9 +1696,17 @@ export default function CRMPage() {
                             <td className="px-4 py-3">
                               {k.scopes?.length ? (
                                 <div className="flex flex-wrap gap-1">
-                                  {k.scopes.map((s: string) => (
-                                    <span key={s} className="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">{s}</span>
-                                  ))}
+                                  {k.scopes.map((s: string) => {
+                                    let label = s;
+                                    let color = 'bg-blue-50 text-blue-700 border-blue-200';
+                                    if (s === 'crm:admin') { label = 'Админ'; color = 'bg-red-50 text-red-700 border-red-200'; }
+                                    else if (s === 'crm:read') { label = 'Чтение'; color = 'bg-emerald-50 text-emerald-700 border-emerald-200'; }
+                                    else if (s === 'crm:write') { label = 'Запись и Удаление'; color = 'bg-amber-50 text-amber-700 border-amber-200'; }
+                                    else if (s === 'contacts:write') { label = 'Запись'; color = 'bg-indigo-50 text-indigo-700 border-indigo-200'; }
+                                    return (
+                                      <span key={s} className={`border text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${color}`}>{label}</span>
+                                    );
+                                  })}
                                 </div>
                               ) : <span className="text-neutral-400 text-xs italic">Полный доступ</span>}
                             </td>
@@ -1699,9 +1722,8 @@ export default function CRMPage() {
                                 size="sm"
                                 className="text-red-500 hover:text-red-600 hover:bg-red-50 h-8 px-2"
                                 onClick={() => handleDeleteMcpKey(k.id)}
-                                disabled={!k.is_active}
                               >
-                                Отозвать
+                                Удалить
                               </Button>
                             </td>
                           </tr>

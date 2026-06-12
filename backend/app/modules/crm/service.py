@@ -215,6 +215,17 @@ class CrmService:
     ) -> None:
         if self.notifications is None:
             return
+            
+        try:
+            from app.modules.mcp.fastmcp_server import current_mcp_principal
+            principal = current_mcp_principal.get()
+            if principal:
+                title = f"🤖 AI-Агент: {title}"
+                agent_name = principal.name or "Интеграция"
+                message = f"[{agent_name}] {message}"
+        except Exception:
+            pass
+
         await self.notifications.publish(
             user_id=user_id,
             event_type=event_type,

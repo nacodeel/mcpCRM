@@ -18,7 +18,7 @@ from app.core.middleware import (
 )
 from app.integrations.database import build_database_manager
 from app.observability.telemetry import setup_telemetry
-from app.modules.mcp.fastmcp_server import mcp
+from app.modules.mcp.fastmcp_server import mcp, configure_mcp_runtime
 
 
 @asynccontextmanager
@@ -27,25 +27,37 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     setup_logging(settings)
 
     db_manager = build_database_manager(settings)
+    notifications = NotificationHub(
+        history_size=settings.NOTIFICATION_HISTORY_SIZE
+    )
+
     app.state.db = db_manager
-    app.state.notifications = NotificationHub(history_size=settings.NOTIFICATION_HISTORY_SIZE)
+    app.state.notifications = notifications
+
+    configure_mcp_runtime(db_manager, notifications)
 
     if settings.AUTO_CREATE_DATABASE:
         await db_manager.init_database()
 
-    # Automatically seed the database if it is empty
     from app.core.seeding import bootstrap_database
+
     try:
         await bootstrap_database(db_manager)
     except Exception as exc:
         import logging
+
         logging.getLogger(__name__).error("Failed to bootstrap database: %s", exc)
 
     setup_telemetry(app, settings)
 
     try:
-        yield
+        if settings.MCP_AUTH_ENABLED:
+            async with mcp.session_manager.run():
+                yield
+        else:
+            yield
     finally:
+        configure_mcp_runtime(None, None)
         await db_manager.dispose()
 
 
@@ -69,18 +81,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(GZipMiddleware, minimum_size=1000)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.TRUSTED_HOSTS)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.BACKEND_CORS_ORIGINS,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["Mcp-Session-Id"],
     )
 
     app.include_router(api_router)
-    
-    if settings.MCP_AUTH_ENABLED:
-        app.mount("/mcp", mcp.sse_app(mount_path="/mcp"))
-        
-    return app
 
+    if settings.MCP_AUTH_ENABLED:
+        app.mount("/mcp", mcp.streamable_http_app())
+
+    return app

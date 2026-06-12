@@ -80,7 +80,7 @@ class McpService:
             if not key_obj or getattr(key_obj, "user_id", None) != user_id:
                 raise UnauthorizedError("Key not found or access denied")
                 
-            await keys.revoke(key_id)
+            await keys.delete_by_id(key_id)
 
     async def ingest_contact(
         self,
@@ -100,70 +100,22 @@ class McpService:
         await self._publish(
             principal.user_id,
             "mcp.contact.ingested",
-            "MCP обновил CRM",
-            "Агент создал или обновил контакт через MCP",
+            "🤖 AI-Агент: MCP обновил CRM",
+            f"[{principal.name or 'Интеграция'}] Агент создал или обновил контакт через MCP",
             result_payload,
         )
         return {"result": result_payload}
 
     async def list_tools(self) -> list[dict[str, Any]]:
+        from app.modules.mcp.fastmcp_server import mcp
+        fastmcp_tools = await mcp.list_tools()
         return [
             {
-                "name": "crm.contacts.list",
-                "description": "List CRM contacts for the authenticated user.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {"page": {"type": "integer"}, "per_page": {"type": "integer"}},
-                },
-            },
-            {
-                "name": "crm.contacts.create",
-                "description": "Create a CRM contact and notify connected frontend clients.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "first_name": {"type": "string"},
-                        "last_name": {"type": "string"},
-                        "phone": {"type": "string"},
-                        "email": {"type": "string"},
-                    },
-                },
-            },
-            {
-                "name": "crm.deals.list",
-                "description": "List CRM deals for the authenticated user.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {"page": {"type": "integer"}, "per_page": {"type": "integer"}},
-                },
-            },
-            {
-                "name": "crm.deals.create",
-                "description": "Create a CRM deal and notify connected frontend clients.",
-                "inputSchema": {
-                    "type": "object",
-                    "required": ["contact_id", "title"],
-                    "properties": {
-                        "contact_id": {"type": "integer"},
-                        "title": {"type": "string"},
-                        "amount": {"type": "number"},
-                    },
-                },
-            },
-            {
-                "name": "crm.search",
-                "description": "Search contacts and deals.",
-                "inputSchema": {
-                    "type": "object",
-                    "required": ["query"],
-                    "properties": {"query": {"type": "string"}, "limit": {"type": "integer"}},
-                },
-            },
-            {
-                "name": "crm.dashboard",
-                "description": "Read CRM dashboard metrics.",
-                "inputSchema": {"type": "object", "properties": {}},
-            },
+                "name": tool.name.replace("_", "."),
+                "description": tool.description,
+                "inputSchema": tool.inputSchema,
+            }
+            for tool in fastmcp_tools
         ]
 
     async def call_tool(
@@ -173,7 +125,27 @@ class McpService:
         arguments: dict[str, Any],
     ) -> dict[str, Any]:
         crm = CrmService(self.db, self.notifications)
-        match name:
+        from app.core.permissions import require_scope
+        
+        TOOL_SCOPES = {
+            "crm.contacts.list": "contacts:read",
+            "crm.contacts.create": "contacts:write",
+            "crm.contacts.update": "contacts:write",
+            "crm.contacts.delete": "contacts:delete",
+            "crm.deals.list": "contacts:read",
+            "crm.deals.create": "contacts:write",
+            "crm.deals.update": "contacts:write",
+            "crm.deals.delete": "deals:delete",
+            "crm.search": "contacts:read",
+            "crm.dashboard": "contacts:read",
+        }
+        
+        normalized_name = name.replace("_", ".")
+        req_scope = TOOL_SCOPES.get(normalized_name)
+        if req_scope:
+            require_scope(principal.scopes, req_scope)
+            
+        match normalized_name:
             case "crm.contacts.list":
                 data = await crm.list_contacts(
                     principal.user_id,
@@ -189,6 +161,21 @@ class McpService:
                 data = await crm.create_contact(
                     principal.user_id, ContactCreateRequest(**contact_payload)
                 )
+            case "crm.contacts.update":
+                contact_id = int(arguments.pop("contact_id"))
+                from app.modules.crm.schemas import ContactUpdateRequest
+                contact_payload = dict(arguments)
+                if "phone" in contact_payload:
+                    contact_payload.setdefault("phones", [contact_payload.pop("phone")])
+                if "email" in contact_payload:
+                    contact_payload.setdefault("emails", [contact_payload.pop("email")])
+                data = await crm.update_contact(
+                    principal.user_id, contact_id, ContactUpdateRequest(**contact_payload)
+                )
+            case "crm.contacts.delete":
+                contact_id = int(arguments.get("contact_id"))
+                await crm.delete_contact(principal.user_id, contact_id)
+                data = {"success": True, "message": f"Contact {contact_id} deleted successfully"}
             case "crm.deals.list":
                 data = await crm.list_deals(
                     principal.user_id,
@@ -197,6 +184,16 @@ class McpService:
                 )
             case "crm.deals.create":
                 data = await crm.create_deal(principal.user_id, DealCreateRequest(**arguments))
+            case "crm.deals.update":
+                deal_id = int(arguments.pop("deal_id"))
+                from app.modules.crm.schemas import DealUpdateRequest
+                data = await crm.update_deal(
+                    principal.user_id, deal_id, DealUpdateRequest(**arguments)
+                )
+            case "crm.deals.delete":
+                deal_id = int(arguments.get("deal_id"))
+                await crm.delete_deal(principal.user_id, deal_id)
+                data = {"success": True, "message": f"Deal {deal_id} deleted successfully"}
             case "crm.search":
                 query = str(arguments.get("query", "")).strip()
                 if not query:

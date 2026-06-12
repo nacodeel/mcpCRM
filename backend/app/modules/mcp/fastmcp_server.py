@@ -17,15 +17,48 @@ from app.modules.crm.service import CrmService
 from app.modules.mcp.schemas import McpPrincipal
 from app.modules.mcp.service import McpService
 
-# Define current principal contextvar
+
 current_mcp_principal: contextvars.ContextVar[McpPrincipal | None] = contextvars.ContextVar(
-    "current_mcp_principal", default=None
+    "current_mcp_principal",
+    default=None,
 )
 
-mcp = FastMCP("mcpCRM")
+mcp = FastMCP(
+    "mcpCRM",
+    stateless_http=True,
+    json_response=True,
+)
+
+_mcp_db: Any | None = None
+_mcp_notifications: Any | None = None
+
+
+def configure_mcp_runtime(db: Any | None, notifications: Any | None = None) -> None:
+    global _mcp_db, _mcp_notifications
+    _mcp_db = db
+    _mcp_notifications = notifications
+
+
+def extract_bearer_token(ctx: Context) -> str | None:
+    request = ctx.request_context.request if (ctx and ctx.request_context) else None
+    if not request:
+        return None
+
+    auth = request.headers.get("authorization")
+    if not auth:
+        return None
+
+    prefix = "Bearer "
+    if auth.startswith(prefix):
+        return auth[len(prefix):].strip()
+
+    return auth.strip()
 
 
 def get_db_and_hub(ctx: Context) -> tuple[Any, Any]:
+    if _mcp_db is not None:
+        return _mcp_db, _mcp_notifications
+
     request = ctx.request_context.request if (ctx and ctx.request_context) else None
     if request and hasattr(request, "app") and request.app:
         db = getattr(request.app.state, "db", None)
@@ -33,45 +66,46 @@ def get_db_and_hub(ctx: Context) -> tuple[Any, Any]:
         if db:
             return db, notifications
 
-    # Fallback for Stdio/CLI context
     from app.core.config import get_settings
     from app.integrations.database import build_database_manager
 
     settings = get_settings()
-    
-    # Standard fallback DB connection for CLI running outside of Docker (use localhost if db is not reachable/running outside container network)
-    # FastMCP client connects via stdio, where db service hostname 'db' is not resolvable.
-    # We replace 'db:5432' with 'localhost:5432' if database connection fails or if we are outside docker.
-    db_url = settings.DATABASE_URL
-    if "db:5432" in db_url and not os.path.exists("/.dockerenv"):
-        db_url = db_url.replace("db:5432", "localhost:5432")
-    
-    settings.DATABASE_URL = db_url
     db = build_database_manager(settings)
     return db, None
 
 
 async def check_auth(required_scope: str, ctx: Context) -> McpPrincipal:
-    principal = current_mcp_principal.get()
-    if principal is None:
-        env_key = os.environ.get("MCP_API_KEY") or os.environ.get("MCP_KEY")
-        if env_key:
-            db, notifications = get_db_and_hub(ctx)
-            service = McpService(db, notifications)
-            try:
-                principal = await service.authenticate(env_key)
-                current_mcp_principal.set(principal)
-            except Exception as e:
-                raise ValueError(f"Failed to authenticate key from environment: {e}")
+    raw_key = (
+        extract_bearer_token(ctx)
+        or os.environ.get("MCP_API_KEY")
+        or os.environ.get("MCP_KEY")
+    )
 
-    if principal is None:
-        raise ValueError("Not authenticated. Please specify a valid MCP key via MCP_API_KEY or MCP_KEY.")
+    if not raw_key:
+        raise ValueError(
+            "Not authenticated. Send Authorization: Bearer <MCP_KEY> "
+            "or set MCP_API_KEY/MCP_KEY."
+        )
+
+    db, notifications = get_db_and_hub(ctx)
+    service = McpService(db, notifications)
+
+    try:
+        principal = await service.authenticate(raw_key)
+    except Exception as exc:
+        raise ValueError(f"Failed to authenticate MCP key: {exc}") from exc
+
     require_scope(principal.scopes, required_scope)
+    current_mcp_principal.set(principal)
     return principal
 
 
 @mcp.tool()
-async def crm_contacts_list(ctx: Context, page: int = 1, per_page: int = 50) -> dict[str, Any]:
+async def crm_contacts_list(
+    ctx: Context,
+    page: int = 1,
+    per_page: int = 50,
+) -> dict[str, Any]:
     """List CRM contacts for the authenticated user."""
     principal = await check_auth("contacts:read", ctx)
     db, hub = get_db_and_hub(ctx)
@@ -93,14 +127,11 @@ async def crm_contacts_create(
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
 
-    phones = [phone] if phone else []
-    emails = [email] if email else []
-
     payload = ContactCreateRequest(
         first_name=first_name,
         last_name=last_name,
-        phones=phones,
-        emails=emails,
+        phones=[phone] if phone else [],
+        emails=[email] if email else [],
     )
     data = await crm.create_contact(principal.user_id, payload)
     return {"contact": to_jsonable(data)}
@@ -131,7 +162,10 @@ async def crm_contacts_update(
 
 
 @mcp.tool()
-async def crm_contacts_delete(ctx: Context, contact_id: int) -> dict[str, Any]:
+async def crm_contacts_delete(
+    ctx: Context,
+    contact_id: int,
+) -> dict[str, Any]:
     """Delete a CRM contact."""
     principal = await check_auth("contacts:delete", ctx)
     db, hub = get_db_and_hub(ctx)
@@ -141,7 +175,11 @@ async def crm_contacts_delete(ctx: Context, contact_id: int) -> dict[str, Any]:
 
 
 @mcp.tool()
-async def crm_deals_list(ctx: Context, page: int = 1, per_page: int = 50) -> dict[str, Any]:
+async def crm_deals_list(
+    ctx: Context,
+    page: int = 1,
+    per_page: int = 50,
+) -> dict[str, Any]:
     """List CRM deals for the authenticated user."""
     principal = await check_auth("contacts:read", ctx)
     db, hub = get_db_and_hub(ctx)
@@ -198,7 +236,10 @@ async def crm_deals_update(
 
 
 @mcp.tool()
-async def crm_deals_delete(ctx: Context, deal_id: int) -> dict[str, Any]:
+async def crm_deals_delete(
+    ctx: Context,
+    deal_id: int,
+) -> dict[str, Any]:
     """Delete a CRM deal."""
     principal = await check_auth("deals:delete", ctx)
     db, hub = get_db_and_hub(ctx)
@@ -208,7 +249,11 @@ async def crm_deals_delete(ctx: Context, deal_id: int) -> dict[str, Any]:
 
 
 @mcp.tool()
-async def crm_search(ctx: Context, query: str, limit: int = 20) -> dict[str, Any]:
+async def crm_search(
+    ctx: Context,
+    query: str,
+    limit: int = 20,
+) -> dict[str, Any]:
     """Search CRM contacts and deals."""
     principal = await check_auth("contacts:read", ctx)
     db, hub = get_db_and_hub(ctx)
@@ -228,4 +273,8 @@ async def crm_dashboard(ctx: Context) -> dict[str, Any]:
 
 
 if __name__ == "__main__":
-    mcp.run()
+    mcp.run(
+        transport="streamable-http",
+        host="0.0.0.0",
+        port=8000,
+    )
