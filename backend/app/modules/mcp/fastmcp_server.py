@@ -119,19 +119,41 @@ async def crm_contacts_create(
     ctx: Context,
     first_name: str | None = None,
     last_name: str | None = None,
+    middle_name: str | None = None,
     phone: str | None = None,
     email: str | None = None,
+    phones: list[str] | None = None,
+    emails: list[str] | None = None,
+    addresses: list[str] | None = None,
+    tags: list[str] | None = None,
+    note: str | None = None,
+    source: str | None = "mcp",
+    status: str | None = None,
 ) -> dict[str, Any]:
-    """Create a CRM contact and notify connected frontend clients."""
+    """Create a CRM contact with phones, emails, addresses, tags and notes."""
     principal = await check_auth("contacts:write", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
 
+    resolved_phones = list(phones or [])
+    if phone and phone not in resolved_phones:
+        resolved_phones.append(phone)
+
+    resolved_emails = list(emails or [])
+    if email and email not in resolved_emails:
+        resolved_emails.append(email)
+
     payload = ContactCreateRequest(
         first_name=first_name,
         last_name=last_name,
-        phones=[phone] if phone else [],
-        emails=[email] if email else [],
+        middle_name=middle_name,
+        phones=resolved_phones,
+        emails=resolved_emails,
+        addresses=addresses or [],
+        tags=tags or [],
+        note=note,
+        source=source,
+        status=status,
     )
     data = await crm.create_contact(principal.user_id, payload)
     return {"contact": to_jsonable(data)}
@@ -143,22 +165,135 @@ async def crm_contacts_update(
     contact_id: int,
     first_name: str | None = None,
     last_name: str | None = None,
+    middle_name: str | None = None,
     phone: str | None = None,
     email: str | None = None,
+    phones: list[str] | None = None,
+    emails: list[str] | None = None,
+    addresses: list[str] | None = None,
+    tags: list[str] | None = None,
+    note: str | None = None,
+    status: str | None = None,
 ) -> dict[str, Any]:
-    """Update an existing CRM contact."""
+    """Update an existing CRM contact including their phones, emails, addresses, tags and notes."""
     principal = await check_auth("contacts:write", ctx)
     db, hub = get_db_and_hub(ctx)
     crm = CrmService(db, hub)
 
+    resolved_phones = list(phones) if phones is not None else None
+    if phone:
+        if resolved_phones is None:
+            resolved_phones = []
+        if phone not in resolved_phones:
+            resolved_phones.append(phone)
+
+    resolved_emails = list(emails) if emails is not None else None
+    if email:
+        if resolved_emails is None:
+            resolved_emails = []
+        if email not in resolved_emails:
+            resolved_emails.append(email)
+
     payload = ContactUpdateRequest(
         first_name=first_name,
         last_name=last_name,
-        phones=[phone] if phone is not None else None,
-        emails=[email] if email is not None else None,
+        middle_name=middle_name,
+        phones=resolved_phones,
+        emails=resolved_emails,
+        addresses=addresses,
+        tags=tags,
+        note=note,
+        status=status,
     )
     data = await crm.update_contact(principal.user_id, contact_id, payload)
     return {"contact": to_jsonable(data)}
+
+
+@mcp.tool()
+async def crm_batch_create_contacts(
+    ctx: Context,
+    contacts: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Create multiple CRM contacts in a single batch operation."""
+    principal = await check_auth("contacts:write", ctx)
+    db, hub = get_db_and_hub(ctx)
+    crm = CrmService(db, hub)
+
+    created_contacts = []
+    for item in contacts:
+        payload = ContactCreateRequest(
+            first_name=item.get("first_name"),
+            last_name=item.get("last_name"),
+            middle_name=item.get("middle_name"),
+            phones=item.get("phones") or ([item.get("phone")] if item.get("phone") else []),
+            emails=item.get("emails") or ([item.get("email")] if item.get("email") else []),
+            addresses=item.get("addresses") or [],
+            tags=item.get("tags") or [],
+            note=item.get("note"),
+            source=item.get("source", "mcp_batch"),
+            status=item.get("status"),
+        )
+        contact_data = await crm.create_contact(principal.user_id, payload)
+        created_contacts.append(to_jsonable(contact_data))
+
+    return {"contacts": created_contacts, "count": len(created_contacts)}
+
+
+@mcp.tool()
+async def crm_create_contact_with_deal(
+    ctx: Context,
+    first_name: str | None = None,
+    last_name: str | None = None,
+    middle_name: str | None = None,
+    phone: str | None = None,
+    email: str | None = None,
+    phones: list[str] | None = None,
+    emails: list[str] | None = None,
+    addresses: list[str] | None = None,
+    tags: list[str] | None = None,
+    note: str | None = None,
+    deal_title: str = "Новая сделка",
+    deal_amount: float | None = None,
+    deal_description: str | None = None,
+) -> dict[str, Any]:
+    """Create a contact and immediately create and link a deal to them in one turn."""
+    principal = await check_auth("contacts:write", ctx)
+    db, hub = get_db_and_hub(ctx)
+    crm = CrmService(db, hub)
+
+    resolved_phones = list(phones or [])
+    if phone and phone not in resolved_phones:
+        resolved_phones.append(phone)
+
+    resolved_emails = list(emails or [])
+    if email and email not in resolved_emails:
+        resolved_emails.append(email)
+
+    contact_payload = ContactCreateRequest(
+        first_name=first_name,
+        last_name=last_name,
+        middle_name=middle_name,
+        phones=resolved_phones,
+        emails=resolved_emails,
+        addresses=addresses or [],
+        tags=tags or [],
+        note=note,
+        source="mcp_with_deal",
+    )
+    contact = await crm.create_contact(principal.user_id, contact_payload)
+    
+    deal_payload = DealCreateRequest(
+        contact_id=contact.id,
+        title=deal_title,
+        amount=Decimal(str(deal_amount)) if deal_amount is not None else None,
+        description=deal_description,
+    )
+    deal = await crm.create_deal(principal.user_id, deal_payload)
+
+    return {
+        "contact": to_jsonable(contact),
+        "deal": to_jsonable(deal)
+    }
 
 
 @mcp.tool()

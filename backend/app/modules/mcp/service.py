@@ -138,6 +138,8 @@ class McpService:
             "crm.deals.delete": "deals:delete",
             "crm.search": "contacts:read",
             "crm.dashboard": "contacts:read",
+            "crm.batch.create.contacts": "contacts:write",
+            "crm.create.contact.with.deal": "contacts:write",
         }
         
         normalized_name = name.replace("_", ".")
@@ -176,6 +178,57 @@ class McpService:
                 contact_id = int(arguments.get("contact_id"))
                 await crm.delete_contact(principal.user_id, contact_id)
                 data = {"success": True, "message": f"Contact {contact_id} deleted successfully"}
+            case "crm.batch.create.contacts":
+                created_contacts = []
+                for item in arguments.get("contacts", []):
+                    payload = ContactCreateRequest(
+                        first_name=item.get("first_name"),
+                        last_name=item.get("last_name"),
+                        middle_name=item.get("middle_name"),
+                        phones=item.get("phones") or ([item.get("phone")] if item.get("phone") else []),
+                        emails=item.get("emails") or ([item.get("email")] if item.get("email") else []),
+                        addresses=item.get("addresses") or [],
+                        tags=item.get("tags") or [],
+                        note=item.get("note"),
+                        source=item.get("source", "mcp_batch"),
+                        status=item.get("status"),
+                    )
+                    contact_data = await crm.create_contact(principal.user_id, payload)
+                    created_contacts.append(contact_data)
+                data = {"contacts": created_contacts, "count": len(created_contacts)}
+            case "crm.create.contact.with.deal":
+                resolved_phones = list(arguments.get("phones") or [])
+                if arguments.get("phone") and arguments.get("phone") not in resolved_phones:
+                    resolved_phones.append(arguments.get("phone"))
+
+                resolved_emails = list(arguments.get("emails") or [])
+                if arguments.get("email") and arguments.get("email") not in resolved_emails:
+                    resolved_emails.append(arguments.get("email"))
+
+                contact_payload = ContactCreateRequest(
+                    first_name=arguments.get("first_name"),
+                    last_name=arguments.get("last_name"),
+                    middle_name=arguments.get("middle_name"),
+                    phones=resolved_phones,
+                    emails=resolved_emails,
+                    addresses=arguments.get("addresses") or [],
+                    tags=arguments.get("tags") or [],
+                    note=arguments.get("note"),
+                    source="mcp_with_deal",
+                )
+                contact = await crm.create_contact(principal.user_id, contact_payload)
+                
+                deal_payload = DealCreateRequest(
+                    contact_id=contact.id,
+                    title=arguments.get("deal_title", "Новая сделка"),
+                    amount=Decimal(str(arguments.get("deal_amount"))) if arguments.get("deal_amount") is not None else None,
+                    description=arguments.get("deal_description"),
+                )
+                deal = await crm.create_deal(principal.user_id, deal_payload)
+                data = {
+                    "contact": contact,
+                    "deal": deal
+                }
             case "crm.deals.list":
                 data = await crm.list_deals(
                     principal.user_id,
